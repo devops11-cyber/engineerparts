@@ -38,6 +38,45 @@ type WooStoreProduct = Omit<
   attributes: Array<{ name: string; terms: Array<{ name: string }> }>;
 };
 
+export interface WooOrderInput {
+  payment_method: "nomod";
+  payment_method_title: "Nomod";
+  set_paid: false;
+  billing: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    country: string;
+    email: string;
+    phone: string;
+  };
+  shipping?: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    country: string;
+  };
+  line_items: Array<{ product_id: number; quantity: number }>;
+  customer_note: string;
+  meta_data: Array<{ key: string; value: string }>;
+}
+
+export interface WooOrder {
+  id: number;
+  number: string;
+  total: string;
+  currency: string;
+  payment_url: string;
+  line_items: Array<{
+    product_id: number;
+    name: string;
+    quantity: number;
+    total: string;
+  }>;
+}
+
 const conditions: ConditionGrade[] = [
   "New Surplus",
   "New Old Stock",
@@ -50,9 +89,7 @@ const conditions: ConditionGrade[] = [
 
 const listingTypes: ListingType[] = [
   "Buy Now",
-  "Enquiry Only",
   "Buy or Enquire",
-  "Make an Offer",
   "Whole Lot",
   "Equipment Enquiry",
 ];
@@ -79,6 +116,11 @@ function category(product: WooProduct): CategorySlug {
   return product.categories[0]?.slug ?? "uncategorised";
 }
 
+function checkoutUrl(productId: number): string | undefined {
+  const storeUrl = process.env.WOOCOMMERCE_URL?.replace(/\/$/, "");
+  return storeUrl ? `${storeUrl}/checkout/?add-to-cart=${productId}` : undefined;
+}
+
 function mapProduct(product: WooProduct): Product {
   const conditionValue = text(metadata(product, "condition"), attribute(product, "Condition"));
   const listingValue = text(metadata(product, "listing_type"));
@@ -103,10 +145,10 @@ function mapProduct(product: WooProduct): Product {
     condition_notes: text(metadata(product, "condition_notes"), "Not provided"),
     quantity_available: product.stock_quantity,
     price: product.price ? Number(product.price) : null,
-    currency: product.currency_code ?? process.env.WOOCOMMERCE_CURRENCY ?? "",
+    currency: product.currency_code ?? "",
     listing_type: listingTypes.includes(listingValue as ListingType)
       ? (listingValue as ListingType)
-      : "Enquiry Only",
+      : "Buy or Enquire",
     warehouse_location: text(metadata(product, "warehouse_location"), "Not provided"),
     lot_id: text(metadata(product, "lot_id")) || null,
     images: product.images.length
@@ -124,6 +166,7 @@ function mapProduct(product: WooProduct): Product {
     badges: productBadges,
     added_date: product.date_created.slice(0, 10),
     lead_time: text(metadata(product, "lead_time"), "Not provided"),
+    woocommerce_checkout_url: checkoutUrl(product.id),
   };
 }
 
@@ -207,6 +250,7 @@ async function fetchStorePage(page: number, url: string) {
         : product.low_stock_remaining !== null
           ? "onbackorder"
           : "instock",
+      stock_quantity: product.stock_quantity ?? null,
       date_created: "",
       attributes: product.attributes.map((item) => ({
         name: item.name,
@@ -221,6 +265,20 @@ async function fetchStorePage(page: number, url: string) {
     products,
     totalPages: Number(response.headers.get("x-wp-totalpages") ?? "1"),
   };
+}
+
+async function fetchStoreCurrency(url: string): Promise<string> {
+  try {
+    const response = await fetch(
+      `${url}/wp-json/wc/store/v1/products?per_page=1`,
+      { next: { revalidate: 300 } },
+    );
+    if (!response.ok) return "";
+    const products = (await response.json()) as WooStoreProduct[];
+    return products[0]?.prices.currency_code ?? "";
+  } catch {
+    return "";
+  }
 }
 
 async function getStoreProducts(url: string): Promise<Product[]> {
@@ -240,7 +298,10 @@ export async function getProducts(): Promise<Product[]> {
   if (!config) return localProducts;
 
   try {
-    const firstPage = await fetchPage(1, config);
+    const [firstPage, currency] = await Promise.all([
+      fetchPage(1, config),
+      fetchStoreCurrency(config.url),
+    ]);
     const remainingPages = await Promise.all(
       Array.from(
         { length: Math.max(0, firstPage.totalPages - 1) },
@@ -248,7 +309,9 @@ export async function getProducts(): Promise<Product[]> {
       ),
     );
 
-    return [firstPage, ...remainingPages].flatMap((page) => page.products).map(mapProduct);
+    return [firstPage, ...remainingPages]
+      .flatMap((page) => page.products)
+      .map((product) => mapProduct({ ...product, currency_code: currency }));
   } catch (error) {
     console.warn(
       `WooCommerce REST API unavailable (${error instanceof Error ? error.message : "unknown error"}); using the public Store API.`,
@@ -259,4 +322,33 @@ export async function getProducts(): Promise<Product[]> {
 
 export async function getProduct(slug: string): Promise<Product | undefined> {
   return (await getProducts()).find((product) => product.slug === slug);
+}
+
+function authorization(config: NonNullable<ReturnType<typeof configuration>>): HeadersInit {
+  return {
+    Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`,
+    "Content-Type": "application/json",
+  };
+}
+
+export async function createWooCommerceOrder(order: WooOrderInput): Promise<WooOrder> {
+  const config = configuration();
+  if (!config) throw new Error("WooCommerce is not configured");
+  if (!config.url.startsWith("https://")) {
+    throw new Error("WooCommerce order creation requires HTTPS");
+  }
+
+  const response = await fetch(`${config.url}/wp-json/wc/v3/orders`, {
+    method: "POST",
+    headers: authorization(config),
+    body: JSON.stringify(order),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`WooCommerce order request failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
+
+  return (await response.json()) as WooOrder;
 }

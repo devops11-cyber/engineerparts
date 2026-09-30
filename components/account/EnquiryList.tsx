@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { readLeads } from "@/lib/leads";
 import type { Lead } from "@/lib/types";
-import { formatDate, formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 export function EnquiryList() {
   const [leads, setLeads] = useState<Lead[] | null>(null);
@@ -22,7 +22,7 @@ export function EnquiryList() {
       <div className="rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-10 text-center">
         <p className="text-lg font-bold text-navy-900">No enquiries yet</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-steel-600">
-          When you enquire, make an offer or request a whole lot, the reference will appear here.
+          When you enquire or request a whole lot, the reference will appear here.
         </p>
         <Link href="/clearance" className="btn-primary mt-5 inline-flex">
           Browse clearance stock
@@ -51,7 +51,6 @@ export function EnquiryList() {
               <td className="px-4 py-3 capitalize text-navy-800">{lead.lead_type.replace(/_/g, " ")}</td>
               <td className="px-4 py-3 text-navy-800">
                 {lead.sku || lead.lot_id || lead.equipment_id || "General"}
-                {lead.offer ? ` · offer ${formatPrice(lead.offer)}` : ""}
               </td>
               <td className="px-4 py-3 text-navy-800">{lead.company}</td>
               <td className="px-4 py-3 font-semibold capitalize text-navy-900">{lead.status}</td>

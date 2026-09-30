@@ -27,7 +27,6 @@ const EMPTY: FormState = {
 
 const TYPES = [
   "Product enquiry",
-  "Make an offer",
   "Whole lot enquiry",
   "Equipment enquiry",
   "Bulk / large quantity",

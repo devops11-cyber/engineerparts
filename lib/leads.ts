@@ -9,7 +9,6 @@ export interface LeadInput {
   phone: string;
   country: string;
   quantity?: number;
-  offer?: number;
   budget?: string;
   message?: string;
   product_id?: string;
@@ -56,9 +55,8 @@ export function readLeads(): Lead[] {
   }
 }
 
-const EVENT_BY_TYPE: Record<LeadType, "enquiry_submit" | "offer_submit" | "whole_lot_enquiry" | "equipment_enquiry" | "bulk_deal_enquiry" | "clearance_alert_signup" | "enquiry_submit"> = {
+const EVENT_BY_TYPE: Record<LeadType, "enquiry_submit" | "whole_lot_enquiry" | "equipment_enquiry" | "bulk_deal_enquiry" | "clearance_alert_signup"> = {
   product_enquiry: "enquiry_submit",
-  make_an_offer: "offer_submit",
   whole_lot_enquiry: "whole_lot_enquiry",
   equipment_enquiry: "equipment_enquiry",
   bulk_deal: "bulk_deal_enquiry",
@@ -82,7 +80,6 @@ export async function submitLead(input: LeadInput): Promise<Lead> {
     phone: input.phone,
     country: input.country,
     quantity: input.quantity,
-    offer: input.offer,
     budget: input.budget,
     message: input.message,
     source: input.source ?? "web",
@@ -98,7 +95,6 @@ export async function submitLead(input: LeadInput): Promise<Lead> {
     lot_id: lead.lot_id,
     equipment_id: lead.equipment_id,
     quantity: lead.quantity,
-    offer: lead.offer,
   });
 
   try {

@@ -13,7 +13,6 @@ interface Facets {
   subcategories: string[];
   conditions: string[];
   locations: string[];
-  productTypes: string[];
   availability: string[];
   priceBounds: [number, number];
   quantityMax: number;
@@ -26,7 +25,6 @@ interface Filters {
   subcategories: string[];
   conditions: string[];
   locations: string[];
-  productTypes: string[];
   availability: string[];
   minPrice: string;
   maxPrice: string;
@@ -41,7 +39,6 @@ const EMPTY_FILTERS: Filters = {
   subcategories: [],
   conditions: [],
   locations: [],
-  productTypes: [],
   availability: [],
   minPrice: "",
   maxPrice: "",
@@ -85,7 +82,6 @@ export function ClearanceBrowser({
         "subcategories",
         "conditions",
         "locations",
-        "productTypes",
         "availability",
       ] as const
     ).forEach((key) => {
@@ -108,7 +104,6 @@ export function ClearanceBrowser({
       subcategories: filters.subcategories,
       conditions: filters.conditions,
       locations: filters.locations,
-      productTypes: filters.productTypes,
       availability: filters.availability,
       minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
@@ -153,7 +148,6 @@ export function ClearanceBrowser({
       { key: "subcategories", title: "Subcategory" },
       { key: "conditions", title: "Condition" },
       { key: "locations", title: "Location" },
-      { key: "productTypes", title: "Type" },
       { key: "availability", title: "Availability" },
     ];
 
@@ -240,7 +234,6 @@ export function ClearanceBrowser({
             aria-label="Maximum price"
           />
         </div>
-        <p className="mt-2 text-[11px] text-steel-500">All prices in AED.</p>
       </FilterGroup>
       <FilterGroup title="Quantity">
         <input
@@ -255,9 +248,6 @@ export function ClearanceBrowser({
       </FilterGroup>
       <FilterGroup title="Location">
         <CheckList options={facets.locations} selected={filters.locations} onToggle={(v) => toggle("locations", v)} />
-      </FilterGroup>
-      <FilterGroup title="Product Type">
-        <CheckList options={facets.productTypes} selected={filters.productTypes} onToggle={(v) => toggle("productTypes", v)} />
       </FilterGroup>
       <FilterGroup title="Availability">
         <CheckList options={facets.availability} selected={filters.availability} onToggle={(v) => toggle("availability", v)} />

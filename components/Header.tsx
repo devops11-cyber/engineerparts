@@ -53,36 +53,6 @@ export function Header() {
 
   return (
     <>
-      <div className="hidden bg-navy-950 text-white lg:block">
-        <div className="shell flex h-9 items-center justify-between text-[11px] font-medium tracking-wide">
-          <div className="flex items-center gap-5 text-steel-300">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-              Live WooCommerce catalogue
-            </span>
-            <span className="text-steel-600" aria-hidden>
-              |
-            </span>
-            <span>Product details and availability from WooCommerce</span>
-          </div>
-          <div className="flex items-center gap-5 text-steel-300">
-            <Link href="/about" className="transition-colors hover:text-white">
-              Browse products
-            </Link>
-            {WHATSAPP_NUMBER ? <a
-              href={whatsappLink("")}
-              onClick={(e) => {
-                e.preventDefault();
-                onWhatsApp("Header utility bar");
-              }}
-              className="transition-colors hover:text-white"
-            >
-              WhatsApp
-            </a> : null}
-          </div>
-        </div>
-      </div>
-
       <header
         className={cn(
           "sticky top-0 z-50 border-b border-navy-100 bg-white transition-shadow",

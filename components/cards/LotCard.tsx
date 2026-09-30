@@ -84,7 +84,6 @@ export function LotCard({ lot }: { lot: Lot }) {
           <div className="flex items-end justify-between border-t border-navy-100 pt-3">
             <div>
               <p className="text-xl font-extrabold text-navy-900">{formatPrice(lot.price)}</p>
-              <p className="text-[11px] text-steel-500">Whole lot &middot; AED</p>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -95,11 +94,6 @@ export function LotCard({ lot }: { lot: Lot }) {
             >
               Enquire for Whole Lot
             </button>
-            {lot.status !== "Sold" ? (
-              <button type="button" onClick={() => openEnquiry({ mode: "offer", lot })} className="btn-outline btn-sm">
-                Make an Offer
-              </button>
-            ) : null}
             <button type="button" onClick={onDownload} className="btn-outline btn-sm">
               Download Lot List
             </button>

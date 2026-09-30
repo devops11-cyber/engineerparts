@@ -8,6 +8,7 @@ import { formatNumber, formatPrice } from "@/lib/utils";
 
 export function CartView() {
   const { items, subtotal, total, updateQuantity, removeItem, ready } = useCart();
+  const currency = items[0]?.currency ?? "";
 
   if (!ready) {
     return <p className="text-sm text-steel-600">Loading cart...</p>;
@@ -90,15 +91,15 @@ export function CartView() {
         <dl className="mt-4 space-y-3 text-sm">
           <div className="flex justify-between">
             <dt className="text-steel-600">Subtotal</dt>
-            <dd className="font-semibold text-navy-900">{formatPrice(subtotal)}</dd>
+            <dd className="font-semibold text-navy-900">{formatPrice(subtotal, currency)}</dd>
           </div>
           <div className="flex justify-between border-t border-navy-100 pt-3 text-base">
-            <dt className="font-bold text-navy-900">Total (AED)</dt>
-            <dd className="font-extrabold text-navy-900">{formatPrice(total)}</dd>
+            <dt className="font-bold text-navy-900">Total</dt>
+            <dd className="font-extrabold text-navy-900">{formatPrice(total, currency)}</dd>
           </div>
         </dl>
         <p className="mt-3 text-[11px] leading-relaxed text-steel-500">
-          Prices are in AED. Collection or freight is confirmed after the order request is logged.
+          Prices use the currency supplied by WooCommerce. Collection or freight is confirmed after the order request is logged.
         </p>
         <Link href="/checkout" className="btn-primary mt-5 w-full">
           Proceed to checkout

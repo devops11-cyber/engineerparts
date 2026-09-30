@@ -85,7 +85,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    window.localStorage.removeItem(STORAGE_KEY);
+    setItems([]);
+  }, []);
 
   const value = useMemo<CartContextValue>(() => {
     const count = items.reduce((sum, line) => sum + line.quantity, 0);

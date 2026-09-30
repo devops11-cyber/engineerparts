@@ -4,7 +4,7 @@ import { EnquiryList } from "@/components/account/EnquiryList";
 
 export const metadata: Metadata = {
   title: "My Enquiries",
-  description: "Track product enquiries, offers and lot requests submitted to the Engineerparts.com clearance desk.",
+  description: "Track product enquiries and lot requests submitted to the Engineerparts.com clearance desk.",
 };
 
 export default function MyEnquiriesPage() {
@@ -13,7 +13,7 @@ export default function MyEnquiriesPage() {
       <PageHero
         breadcrumbs={[{ label: "My Enquiries" }]}
         eyebrow="My Enquiries"
-        title="Enquiries and offers from this browser"
+        title="Enquiries from this browser"
         description="Leads are stored locally and posted to /api/leads, structured for future CRM, email and database integration."
         tone="light"
       />

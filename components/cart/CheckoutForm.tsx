@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useCart } from "@/components/providers/CartProvider";
 import { track } from "@/lib/analytics";
 import { formatPrice } from "@/lib/utils";
@@ -33,11 +33,10 @@ const EMPTY: CheckoutState = {
 export function CheckoutForm() {
   const { items, subtotal, total, clear, ready } = useCart();
   const [form, setForm] = useState<CheckoutState>(EMPTY);
-  const [state, setState] = useState<"idle" | "submitting" | "done">("idle");
+  const [state, setState] = useState<"idle" | "submitting">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [orderRef, setOrderRef] = useState("");
 
-  const snapshot = useMemo(() => items, [items]);
+  const currency = items[0]?.currency ?? "";
 
   function update<K extends keyof CheckoutState>(key: K, value: CheckoutState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -51,9 +50,10 @@ export function CheckoutForm() {
       !form.company.trim() ||
       !form.email.trim() ||
       !form.phone.trim() ||
-      !form.country.trim()
+      !/^[A-Za-z]{2}$/.test(form.country.trim()) ||
+      !form.billingAddress.trim()
     ) {
-      setError("Please complete name, company, email, phone and country.");
+      setError("Please complete all required fields. Use a two-letter country code such as AE.");
       return;
     }
     if (form.fulfilment === "delivery" && !form.shippingAddress.trim()) {
@@ -68,72 +68,36 @@ export function CheckoutForm() {
     const order = {
       order_id: reference,
       customer: form,
-      items,
-      subtotal,
-      total,
-      currency: "AED",
-      payment_status: "placeholder",
-      created_at: new Date().toISOString(),
+      items: items.map(({ productId, quantity }) => ({ productId, quantity })),
     };
 
     try {
-      await fetch("/api/orders", {
+      const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(order),
       });
-    } catch {
-      void 0;
+      const result = (await response.json()) as { error?: string; payment_url?: string };
+      if (!response.ok || !result.payment_url) {
+        throw new Error(result.error || "Unable to start payment");
+      }
+      clear();
+      window.location.assign(result.payment_url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to place order");
+      setState("idle");
     }
-
-    track("purchase", { order_id: reference, value: total, item_count: items.length });
-    setOrderRef(reference);
-    clear();
-    setState("done");
   }
 
   if (!ready) return <p className="text-sm text-steel-600">Loading checkout...</p>;
 
-  if (!snapshot.length && state !== "done") {
+  if (!items.length) {
     return (
       <div className="rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-10 text-center">
         <p className="text-lg font-bold text-navy-900">Your cart is empty</p>
         <Link href="/clearance" className="btn-primary mt-5 inline-flex">
           Browse clearance stock
         </Link>
-      </div>
-    );
-  }
-
-  if (state === "done") {
-    return (
-      <div className="rounded-card border border-emerald-200 bg-white p-8 shadow-card">
-        <p className="eyebrow text-emerald-700">Order confirmed</p>
-        <h2 className="mt-2 text-2xl font-extrabold text-navy-900">Thank you. Your clearance order is logged.</h2>
-        <p className="mt-3 text-sm text-steel-700">
-          Reference <span className="font-mono font-semibold">{orderRef}</span>. This is an order
-          request — we will confirm stock and freight before dispatch or collection.
-        </p>
-        <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-steel-500">Contact</dt>
-            <dd className="font-semibold text-navy-900">{form.email}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-steel-500">Fulfilment</dt>
-            <dd className="font-semibold text-navy-900">
-              {form.fulfilment === "collection" ? "Collection by appointment" : "Delivery / freight"}
-            </dd>
-          </div>
-        </dl>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/clearance" className="btn-navy">
-            Continue browsing
-          </Link>
-          <Link href="/my-enquiries" className="btn-outline">
-            View my enquiries
-          </Link>
-        </div>
       </div>
     );
   }
@@ -161,8 +125,8 @@ export function CheckoutForm() {
               <input className="field" value={form.phone} onChange={(e) => update("phone", e.target.value)} required />
             </label>
             <label className="block sm:col-span-2">
-              <span className="field-label">Country *</span>
-              <input className="field" value={form.country} onChange={(e) => update("country", e.target.value)} required />
+              <span className="field-label">Country code *</span>
+              <input className="field" value={form.country} onChange={(e) => update("country", e.target.value)} placeholder="AE" minLength={2} maxLength={2} required />
             </label>
           </div>
         </section>
@@ -172,7 +136,7 @@ export function CheckoutForm() {
           <div className="mt-4 space-y-4">
             <label className="block">
               <span className="field-label">Billing address *</span>
-              <textarea rows={3} className="field resize-y" value={form.billingAddress} onChange={(e) => update("billingAddress", e.target.value)} />
+              <textarea rows={3} className="field resize-y" value={form.billingAddress} onChange={(e) => update("billingAddress", e.target.value)} required />
             </label>
             <fieldset>
               <legend className="field-label">Fulfilment</legend>
@@ -212,7 +176,7 @@ export function CheckoutForm() {
         <section className="rounded-card border border-navy-100 bg-white p-6 shadow-card">
           <h2 className="text-base font-extrabold text-navy-900">Payment</h2>
           <p className="mt-2 text-sm text-steel-600">
-            Payment method: order request — we will confirm. No payment is taken on this page.
+            After placing the order, you will continue to WooCommerce&apos;s secure payment page and pay with Nomod.
           </p>
           <label className="mt-4 block">
             <span className="field-label">Order notes</span>
@@ -241,11 +205,11 @@ export function CheckoutForm() {
         <dl className="mt-4 space-y-2 border-t border-navy-100 pt-4 text-sm">
           <div className="flex justify-between">
             <dt className="text-steel-600">Subtotal</dt>
-            <dd className="font-semibold">{formatPrice(subtotal)}</dd>
+            <dd className="font-semibold">{formatPrice(subtotal, currency)}</dd>
           </div>
           <div className="flex justify-between text-base">
-            <dt className="font-bold">Total (AED)</dt>
-            <dd className="font-extrabold">{formatPrice(total)}</dd>
+            <dt className="font-bold">Total</dt>
+            <dd className="font-extrabold">{formatPrice(total, currency)}</dd>
           </div>
         </dl>
         {error ? (

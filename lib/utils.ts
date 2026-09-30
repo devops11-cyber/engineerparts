@@ -46,7 +46,6 @@ const STATUS_STYLES: Record<ProductStatus, string> = {
   Available: "border-emerald-200 bg-emerald-50 text-emerald-800",
   "Low Stock": "border-amber-200 bg-amber-50 text-amber-800",
   Reserved: "border-brand-200 bg-brand-50 text-brand-800",
-  "Offer Pending": "border-violet-200 bg-violet-50 text-violet-800",
   Sold: "border-steel-300 bg-steel-100 text-steel-600",
 };
 
@@ -64,10 +63,6 @@ export function conditionTone(condition: ConditionGrade): string {
 
 export function isPurchasable(status: ProductStatus): boolean {
   return status === "Available" || status === "Low Stock";
-}
-
-export function canOffer(status: ProductStatus): boolean {
-  return status !== "Sold";
 }
 
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";

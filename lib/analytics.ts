@@ -10,7 +10,6 @@ export type AnalyticsEventName =
   | "begin_checkout"
   | "purchase"
   | "enquiry_submit"
-  | "offer_submit"
   | "whole_lot_enquiry"
   | "equipment_enquiry"
   | "bulk_deal_enquiry"

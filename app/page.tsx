@@ -30,31 +30,13 @@ const WHY = [
   },
   {
     title: "Buy or enquire",
-    copy: "Add fixed-price items straight to the cart, or send an enquiry or offer on anything without a published price.",
+    copy: "Add fixed-price items straight to the cart, or send an enquiry about anything without a published price.",
     icon: <path d="M4 6h2l2.2 10.3a2 2 0 0 0 2 1.7h7.6a2 2 0 0 0 2-1.6L21 9H6" />,
   },
   {
     title: "Direct enquiries",
     copy: "Ask about a product when pricing, quantity or other details are not published.",
     icon: <path d="M12 21c5-2 8-6 8-11a12 12 0 0 0-8-3 12 12 0 0 0-8 3c0 5 3 9 8 11Zm0-11v8m0 0-3-3m3 3 3-3" />,
-  },
-];
-
-const STEPS = [
-  {
-    step: "1",
-    title: "Browse the catalogue",
-    copy: "Filter by the product details currently available in WooCommerce.",
-  },
-  {
-    step: "2",
-    title: "Buy, enquire or make an offer",
-    copy: "Check out eligible fixed-price items online, or send an enquiry about any listing.",
-  },
-  {
-    step: "3",
-    title: "Confirm your request",
-    copy: "Submit your details so the team can follow up on the selected products.",
   },
 ];
 
@@ -185,35 +167,6 @@ export default async function HomePage() {
                 <p className="mt-2 text-sm leading-relaxed text-steel-600">{item.copy}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="shell">
-          <SectionHeading
-            eyebrow="How it works"
-            title="Three steps to move stock"
-            align="center"
-          />
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {STEPS.map((item) => (
-              <div key={item.step} className="relative rounded-card border border-navy-100 bg-white p-6 shadow-card">
-                <span className="display absolute -top-4 left-6 inline-flex h-9 w-9 items-center justify-center rounded-md bg-navy-900 text-sm font-extrabold text-white">
-                  {item.step}
-                </span>
-                <h3 className="mt-4 text-base font-bold text-navy-900">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-steel-600">{item.copy}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link href="/clearance" className="btn-primary">
-              Start browsing clearance
-            </Link>
-            <Link href="/contact" className="btn-outline">
-              Talk to the clearance desk
-            </Link>
           </div>
         </div>
       </section>

@@ -5,7 +5,7 @@ import { ContactForm } from "@/components/forms/ContactForm";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Contact the Engineerparts.com clearance desk. Product, lot and equipment enquiries, offers and bulk requirements.",
+    "Contact the Engineerparts.com clearance desk. Product, lot and equipment enquiries and bulk requirements.",
 };
 
 export default function ContactPage() {

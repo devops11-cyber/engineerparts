@@ -53,7 +53,7 @@ export function LotActions({ lot }: { lot: Lot }) {
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-navy-100 pb-4">
         <div>
           <p className="text-3xl font-extrabold tracking-tight text-navy-900">{formatPrice(lot.price)}</p>
-          <p className="mt-1 text-xs text-steel-500">Whole lot &middot; AED. Collection or freight quoted separately.</p>
+          <p className="mt-1 text-xs text-steel-500">Collection or freight quoted separately.</p>
         </div>
         <div className="text-right">
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-500">Approx. units</p>
@@ -69,11 +69,6 @@ export function LotActions({ lot }: { lot: Lot }) {
         >
           Enquire for Whole Lot
         </button>
-        {lot.status !== "Sold" ? (
-          <button type="button" onClick={() => openEnquiry({ mode: "offer", lot })} className="btn-outline">
-            Make an Offer
-          </button>
-        ) : null}
         <button type="button" onClick={onDownload} className="btn-outline">
           Download Lot List
         </button>
@@ -87,8 +82,8 @@ export function LotActions({ lot }: { lot: Lot }) {
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-steel-500">
-        An offer is not guaranteed to be accepted. Quantities are approximate totals from the warehouse
-        count and will be confirmed before collection or dispatch.
+        Quantities are approximate totals from the warehouse count and will be confirmed before
+        collection or dispatch.
       </p>
     </div>
   );

@@ -65,7 +65,6 @@ export const LEAD_FIELDS = [
   "phone",
   "country",
   "quantity",
-  "offer",
   "message",
   "source",
   "status",
@@ -74,9 +73,7 @@ export const LEAD_FIELDS = [
 
 export const LISTING_TYPES = [
   "Buy Now",
-  "Enquiry Only",
   "Buy or Enquire",
-  "Make an Offer",
   "Whole Lot",
   "Equipment Enquiry",
 ] as const;

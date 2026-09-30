@@ -1,8 +1,6 @@
 export type ListingType =
   | "Buy Now"
-  | "Enquiry Only"
   | "Buy or Enquire"
-  | "Make an Offer"
   | "Whole Lot"
   | "Equipment Enquiry";
 
@@ -10,7 +8,6 @@ export type ProductStatus =
   | "Available"
   | "Low Stock"
   | "Reserved"
-  | "Offer Pending"
   | "Sold";
 
 export type ConditionGrade =
@@ -75,6 +72,7 @@ export interface Product {
   badges: ListingBadge[];
   added_date: string;
   lead_time: string;
+  woocommerce_checkout_url?: string;
 }
 
 export interface LotLineItem {
@@ -142,7 +140,6 @@ export interface Brand {
 
 export type LeadType =
   | "product_enquiry"
-  | "make_an_offer"
   | "whole_lot_enquiry"
   | "equipment_enquiry"
   | "general_contact"
@@ -164,7 +161,6 @@ export interface Lead {
   phone: string;
   country: string;
   quantity?: number;
-  offer?: number;
   budget?: string;
   message?: string;
   source: string;

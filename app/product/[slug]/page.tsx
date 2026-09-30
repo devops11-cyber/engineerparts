@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!product) return { title: "Product not found" };
   return {
     title: `${product.name} - ${product.sku}`,
-    description: `${product.condition}. ${product.quantity_available === null ? "Contact for quantity" : `${formatNumber(product.quantity_available)} units available`}. Clearance stock from Engineerparts.com.`,
+    description: `${product.condition !== "Not provided" ? `${product.condition}. ` : ""}${product.quantity_available === null ? "Contact for quantity" : `${formatNumber(product.quantity_available)} units available`}. Clearance stock from Engineerparts.com.`,
   };
 }
 
@@ -51,10 +51,9 @@ export default async function ProductPage({ params }: { params: { slug: string }
     ["Status", product.status],
     ["Quantity available", product.quantity_available === null ? "Contact for quantity" : `${formatNumber(product.quantity_available)} units`],
     ["Warehouse", product.warehouse_location],
-    ["Listing type", product.listing_type],
     ["Dispatch", product.lead_time],
-    ["Listed", formatDate(product.added_date)],
-  ];
+    ["Listed", product.added_date ? formatDate(product.added_date) : "Not provided"],
+  ].filter(([, value]) => value !== "Not provided");
 
   return (
     <>
@@ -90,7 +89,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
                 {product.brand}
               </Link>
               <StatusPill status={product.status} />
-              <ConditionPill condition={product.condition} />
+              {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
             </div>
 
             <h1 className="mt-3 text-2xl font-extrabold leading-tight text-navy-900 sm:text-3xl">
@@ -138,13 +137,17 @@ export default async function ProductPage({ params }: { params: { slug: string }
               <p className="mt-3 text-sm leading-relaxed text-steel-700">{product.description}</p>
             </div>
 
-            <div>
-              <h2 className="text-lg font-extrabold text-navy-900">Condition notes</h2>
-              <div className="mt-3 rounded-card border border-navy-100 bg-white p-4">
-                <ConditionPill condition={product.condition} />
-                <p className="mt-3 text-sm leading-relaxed text-steel-700">{product.condition_notes}</p>
+            {product.condition !== "Not provided" || product.condition_notes !== "Not provided" ? (
+              <div>
+                <h2 className="text-lg font-extrabold text-navy-900">Condition notes</h2>
+                <div className="mt-3 rounded-card border border-navy-100 bg-white p-4">
+                  {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
+                  {product.condition_notes !== "Not provided" ? (
+                    <p className="mt-3 text-sm leading-relaxed text-steel-700">{product.condition_notes}</p>
+                  ) : null}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div>
               <h2 className="text-lg font-extrabold text-navy-900">Specifications</h2>
@@ -217,6 +220,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
+  if (!value || value === "Not provided") return null;
   return (
     <div className="min-w-0">
       <dt className="text-steel-500">{label}</dt>

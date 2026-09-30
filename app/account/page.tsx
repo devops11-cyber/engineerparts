@@ -23,7 +23,7 @@ export default function AccountPage() {
             <p className="text-[11px] font-bold uppercase tracking-wide text-brand-700">Leads</p>
             <h2 className="mt-2 text-lg font-extrabold text-navy-900">My Enquiries</h2>
             <p className="mt-2 text-sm text-steel-600">
-              Product enquiries, offers, whole-lot requests and bulk deals submitted from this browser.
+              Product enquiries, whole-lot requests and bulk deals submitted from this browser.
             </p>
           </Link>
           <Link href="/cart" className="card p-6 transition-shadow hover:shadow-lift">

@@ -38,7 +38,7 @@ export function EquipmentActions({ unit }: { unit: Equipment }) {
             {formatPrice(unit.price)}
           </p>
           <p className="mt-1 text-xs text-steel-500">
-            {unit.price !== null ? "AED. Freight quoted separately." : "Price on enquiry."}
+            {unit.price !== null ? "Freight quoted separately." : "Price on enquiry."}
           </p>
         </div>
         <div className="text-right">
@@ -64,11 +64,6 @@ export function EquipmentActions({ unit }: { unit: Equipment }) {
         <button type="button" onClick={onWhatsApp} className="btn border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100">
           WhatsApp Us
         </button>
-        {unit.status !== "Sold" && unit.price !== null ? (
-          <button type="button" onClick={() => openEnquiry({ mode: "offer", equipment: unit })} className="btn-outline">
-            Make an Offer
-          </button>
-        ) : null}
       </div>
 
       <dl className="mt-5 space-y-2 border-t border-navy-100 pt-4 text-xs text-steel-600">

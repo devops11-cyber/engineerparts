@@ -7,7 +7,6 @@ export interface BrowserFacets {
   subcategories: string[];
   conditions: string[];
   locations: string[];
-  productTypes: string[];
   availability: string[];
   priceBounds: [number, number];
   quantityMax: number;
@@ -32,7 +31,6 @@ export function buildFacets(items: Product[]): BrowserFacets {
     subcategories: unique(items.map((p) => p.subcategory)),
     conditions: unique(items.map((p) => p.condition)),
     locations: unique(items.map((p) => p.warehouse_location)),
-    productTypes: unique(items.map((p) => p.listing_type)),
     availability: unique(items.map((p) => p.status)),
     priceBounds: [min, max],
     quantityMax: items.reduce((acc, p) => Math.max(acc, p.quantity_available ?? 0), 0),

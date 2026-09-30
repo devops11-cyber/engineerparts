@@ -23,6 +23,7 @@ export function ProductActions({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
 
   const purchasable = isPurchasable(product.status) && product.price !== null && product.quantity_available !== null && product.quantity_available > 0;
+  const wooPurchasable = isPurchasable(product.status) && product.price !== null && Boolean(product.woocommerce_checkout_url);
   const sold = product.status === "Sold";
 
   function onAddToCart() {
@@ -44,6 +45,34 @@ export function ProductActions({ product }: { product: Product }) {
       quantity,
     );
     toast(`${quantity} x ${product.sku} added to cart`);
+  }
+
+  function onWooCommerceCheckout() {
+    if (!wooPurchasable || product.price === null) return;
+    addItem(
+      {
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        slug: product.slug,
+        brand: product.brand,
+        condition: product.condition,
+        unitPrice: product.price,
+        currency: product.currency,
+        maxQuantity: product.quantity_available ?? 99,
+        image: product.images[0],
+        warehouse: product.warehouse_location,
+      },
+      quantity,
+    );
+    track("begin_checkout", {
+      product_id: product.id,
+      sku: product.sku,
+      quantity,
+      value: (product.price ?? 0) * quantity,
+      provider: "woocommerce",
+    });
+    window.location.assign("/checkout");
   }
 
   function onWhatsApp() {
@@ -69,9 +98,7 @@ export function ProductActions({ product }: { product: Product }) {
           <p className="text-3xl font-extrabold tracking-tight text-navy-900">
             {formatPrice(product.price, product.currency)}
           </p>
-          <p className="mt-1 text-xs text-steel-500">
-            {product.price !== null && product.currency ? `Price in ${product.currency}.` : product.price !== null ? "Currency not provided." : "Price on enquiry."}
-          </p>
+          {product.price === null ? <p className="mt-1 text-xs text-steel-500">Price on enquiry.</p> : null}
         </div>
         <div className="text-right">
           <p className="text-xs font-semibold uppercase tracking-wide text-steel-500">
@@ -89,14 +116,14 @@ export function ProductActions({ product }: { product: Product }) {
         </div>
       ) : null}
 
-      {product.status === "Reserved" || product.status === "Offer Pending" ? (
+      {product.status === "Reserved" ? (
         <div className="mt-4 rounded-md border border-brand-200 bg-brand-50 px-4 py-3 text-xs font-semibold text-brand-800">
           This item is currently {product.status.toLowerCase()}. Enquiries are still logged and we
           will confirm if it is released.
         </div>
       ) : null}
 
-      {purchasable && product.quantity_available !== null ? (
+      {(purchasable || wooPurchasable) && product.quantity_available !== null ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <QuantityStepper value={quantity} max={product.quantity_available} onChange={setQuantity} />
           <span className="text-xs text-steel-500">
@@ -106,8 +133,13 @@ export function ProductActions({ product }: { product: Product }) {
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {wooPurchasable ? (
+          <button type="button" onClick={onWooCommerceCheckout} className="btn-primary sm:col-span-2">
+            Buy Now with WooCommerce
+          </button>
+        ) : null}
         {purchasable ? (
-          <button type="button" onClick={onAddToCart} className="btn-primary sm:col-span-2">
+          <button type="button" onClick={onAddToCart} className="btn-outline sm:col-span-2">
             Add to Cart
           </button>
         ) : null}
@@ -118,11 +150,6 @@ export function ProductActions({ product }: { product: Product }) {
         >
           Enquire About This Item
         </button>
-        {!sold && product.price !== null ? (
-          <button type="button" onClick={() => openEnquiry({ mode: "offer", product })} className="btn-outline">
-            Make an Offer
-          </button>
-        ) : null}
         <button type="button" onClick={onWhatsApp} className="btn border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100">
           WhatsApp
         </button>
@@ -138,18 +165,18 @@ export function ProductActions({ product }: { product: Product }) {
       </div>
 
       <ul className="mt-5 space-y-2 border-t border-navy-100 pt-4 text-xs text-steel-600">
-        <li className="flex items-center justify-between gap-3">
-          <span>Listing type</span>
-          <span className="font-semibold text-navy-800">{product.listing_type}</span>
-        </li>
-        <li className="flex items-center justify-between gap-3">
-          <span>Warehouse location</span>
-          <span className="text-right font-semibold text-navy-800">{product.warehouse_location}</span>
-        </li>
-        <li className="flex items-center justify-between gap-3">
-          <span>Dispatch</span>
-          <span className="text-right font-semibold text-navy-800">{product.lead_time}</span>
-        </li>
+        {product.warehouse_location !== "Not provided" ? (
+          <li className="flex items-center justify-between gap-3">
+            <span>Warehouse location</span>
+            <span className="text-right font-semibold text-navy-800">{product.warehouse_location}</span>
+          </li>
+        ) : null}
+        {product.lead_time !== "Not provided" ? (
+          <li className="flex items-center justify-between gap-3">
+            <span>Dispatch</span>
+            <span className="text-right font-semibold text-navy-800">{product.lead_time}</span>
+          </li>
+        ) : null}
       </ul>
     </div>
   );

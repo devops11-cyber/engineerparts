@@ -19,14 +19,14 @@ export default function PrivacyPage() {
       <section className="section pt-8">
         <div className="shell prose-sm max-w-3xl space-y-6 text-sm leading-relaxed text-steel-700">
           <p>
-            When you submit an enquiry, offer, bulk request or order, we collect your name, company,
+            When you submit an enquiry, bulk request or order, we collect your name, company,
             email, phone, country and the product, lot or equipment references you provide. This
             information is stored so the clearance desk can respond, confirm stock and arrange
             collection or freight.
           </p>
           <p>
             Analytics events such as product views, searches, add-to-cart, purchases, enquiries,
-            offers, WhatsApp clicks and document downloads are recorded in a structured form for
+            enquiries, WhatsApp clicks and document downloads are recorded in a structured form for
             future reporting. They do not include payment card details.
           </p>
           <p>

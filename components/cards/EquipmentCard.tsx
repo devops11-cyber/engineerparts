@@ -80,9 +80,7 @@ export function EquipmentCard({ unit }: { unit: Equipment }) {
           <div className="flex items-end justify-between border-t border-navy-100 pt-3">
             <div>
               <p className="text-xl font-extrabold text-navy-900">{formatPrice(unit.price)}</p>
-              <p className="text-[11px] text-steel-500">
-                {unit.price !== null ? "AED" : "Enquire for pricing"}
-              </p>
+              {unit.price === null ? <p className="text-[11px] text-steel-500">Enquire for pricing</p> : null}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">

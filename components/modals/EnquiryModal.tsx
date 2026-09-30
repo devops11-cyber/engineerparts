@@ -14,7 +14,6 @@ interface FormState {
   phone: string;
   country: string;
   quantity: string;
-  offer: string;
   budget: string;
   enquiryType: string;
   reference: string;
@@ -28,7 +27,6 @@ const EMPTY: FormState = {
   phone: "",
   country: "",
   quantity: "",
-  offer: "",
   budget: "",
   enquiryType: "Product enquiry",
   reference: "",
@@ -37,7 +35,6 @@ const EMPTY: FormState = {
 
 const ENQUIRY_TYPES = [
   "Product enquiry",
-  "Make an offer",
   "Whole lot enquiry",
   "Equipment enquiry",
   "Bulk / large quantity",
@@ -59,7 +56,6 @@ export function EnquiryModal() {
   const unit = target?.equipment;
 
   const leadType: LeadType = useMemo(() => {
-    if (mode === "offer") return "make_an_offer";
     if (mode === "lot") return "whole_lot_enquiry";
     if (mode === "equipment") return "equipment_enquiry";
     if (mode === "bulk") return "bulk_deal";
@@ -68,9 +64,7 @@ export function EnquiryModal() {
 
   const headline =
     target?.heading ??
-    (mode === "offer"
-      ? "Make an offer"
-      : mode === "lot"
+    (mode === "lot"
         ? "Whole lot enquiry"
         : mode === "equipment"
           ? "Enquire about this unit"
@@ -84,7 +78,7 @@ export function EnquiryModal() {
       ...EMPTY,
       quantity: product ? "1" : lot ? String(lot.total_quantity) : "1",
       reference: lot?.lot_reference ?? unit?.reference ?? product?.sku ?? "",
-      enquiryType: mode === "offer" ? "Make an offer" : mode === "lot" ? "Whole lot enquiry" : "Product enquiry",
+      enquiryType: mode === "lot" ? "Whole lot enquiry" : "Product enquiry",
     });
     setSubmitted(null);
     setError(null);
@@ -149,11 +143,6 @@ export function EnquiryModal() {
       );
       return;
     }
-    if (mode === "offer" && !form.offer.trim()) {
-      setError("Please enter your offer value.");
-      return;
-    }
-
     setSubmitting(true);
     try {
       const listingUrl =
@@ -168,8 +157,7 @@ export function EnquiryModal() {
         email: form.email.trim(),
         phone: form.phone.trim(),
         country: form.country.trim(),
-        quantity: mode === "offer" || mode === "product" || mode === "lot" || mode === "equipment" ? quantityWanted : undefined,
-        offer: form.offer ? Number(form.offer) : undefined,
+        quantity: mode === "product" || mode === "lot" || mode === "equipment" ? quantityWanted : undefined,
         budget: form.budget || undefined,
         message: [
           form.message,
@@ -201,9 +189,7 @@ export function EnquiryModal() {
       <div className="relative w-full max-w-2xl animate-fade-up rounded-card border border-navy-100 bg-white shadow-lift">
         <div className="flex items-start justify-between gap-4 border-b border-navy-100 p-5">
           <div>
-            <p className="eyebrow text-brand-600">
-              {mode === "offer" ? "Submit an offer" : "Enquiry"}
-            </p>
+            <p className="eyebrow text-brand-600">Enquiry</p>
             <h2 className="mt-1 text-xl font-extrabold text-navy-900">{headline}</h2>
             {contextLabel ? <p className="mt-1 text-sm text-steel-600">{contextLabel}</p> : null}
           </div>
@@ -228,12 +214,6 @@ export function EnquiryModal() {
                 <span className="font-mono font-semibold">{submitted}</span>. A member of the
                 Engineerparts.com clearance desk will respond during the next working day.
               </p>
-              {mode === "offer" ? (
-                <p className="mt-1.5 text-xs text-emerald-800">
-                  An offer is not guaranteed to be accepted. We will confirm availability and
-                  respond with a decision.
-                </p>
-              ) : null}
             </div>
             <dl className="mt-5 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               {contextLabel ? (
@@ -281,7 +261,7 @@ export function EnquiryModal() {
                   ["Listed price", formatPrice(product.price, product.currency)],
                 ]}
                 note={
-                  product.status === "Reserved" || product.status === "Offer Pending"
+                  product.status === "Reserved"
                     ? `This item is currently ${product.status}. Your enquiry will be logged and we will confirm if it becomes available.`
                     : !isPurchasable(product.status)
                       ? "This item is sold. Tell us what you need and we will match similar clearance stock."
@@ -389,7 +369,7 @@ export function EnquiryModal() {
                       className="field"
                       value={form.budget}
                       onChange={(e) => update("budget", e.target.value)}
-                      placeholder="e.g. 50 units, or AED 5,000"
+                      placeholder="e.g. 50 units or a target budget"
                     />
                   </Field>
                 </>
@@ -408,20 +388,6 @@ export function EnquiryModal() {
                       onChange={(e) => update("quantity", e.target.value)}
                     />
                   </Field>
-                  {mode === "offer" ? (
-                    <Field label="Your offer (AED)" required>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className="field"
-                        value={form.offer}
-                        onChange={(e) => update("offer", e.target.value)}
-                        placeholder={listedPrice !== null ? `Listed ${formatPrice(listedPrice)}` : "Offer value"}
-                        required
-                      />
-                    </Field>
-                  ) : null}
                   {mode === "product" || mode === "equipment" ? (
                     <Field label="Budget / target price (optional)">
                       <input
@@ -448,13 +414,6 @@ export function EnquiryModal() {
               </Field>
             </div>
 
-            {mode === "offer" ? (
-              <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
-                An offer is not guaranteed to be accepted. All offers are reviewed against current
-                stock, condition and other interest.
-              </p>
-            ) : null}
-
             {error ? (
               <p className="mt-4 rounded-md border border-signal-200 bg-signal-50 px-4 py-3 text-sm font-semibold text-signal-700">
                 {error}
@@ -463,7 +422,7 @@ export function EnquiryModal() {
 
             <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-navy-100 pt-4">
               <button type="submit" disabled={submitting} className="btn-primary">
-                {submitting ? "Submitting..." : mode === "offer" ? "Submit Offer" : "Submit Enquiry"}
+                {submitting ? "Submitting..." : "Submit Enquiry"}
               </button>
               <button type="button" onClick={closeEnquiry} className="btn-outline">
                 Cancel

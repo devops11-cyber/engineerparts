@@ -15,6 +15,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
   const { toast } = useToast();
 
   const purchasable = isPurchasable(product.status) && product.price !== null && product.quantity_available !== null && product.quantity_available > 0;
+  const wooPurchasable = isPurchasable(product.status) && product.price !== null && Boolean(product.woocommerce_checkout_url);
   const priceLabel = formatPrice(product.price, product.currency);
   const list = layout === "list";
 
@@ -37,6 +38,24 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
       1,
     );
     toast(`${product.sku} added to cart`);
+  }
+
+  function onWooCommerceCheckout() {
+    if (!wooPurchasable || product.price === null) return;
+    addItem({
+      productId: product.id,
+      sku: product.sku,
+      name: product.name,
+      slug: product.slug,
+      brand: product.brand,
+      condition: product.condition,
+      unitPrice: product.price,
+      currency: product.currency,
+      maxQuantity: product.quantity_available ?? 99,
+      image: product.images[0],
+      warehouse: product.warehouse_location,
+    });
+    window.location.assign("/checkout");
   }
 
   return (
@@ -113,19 +132,15 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
         {list ? <p className="mt-3 text-sm leading-relaxed text-steel-600">{product.description}</p> : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <ConditionPill condition={product.condition} />
-          <span className="text-[11px] text-steel-500">{product.warehouse_location}</span>
+          {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
+          {product.warehouse_location !== "Not provided" ? (
+            <span className="text-[11px] text-steel-500">{product.warehouse_location}</span>
+          ) : null}
         </div>
 
         <div className="mt-auto pt-4">
-          <div className="flex items-end justify-between gap-3 border-t border-navy-100 pt-3">
-            <div>
-              <p className="text-xl font-extrabold tracking-tight text-navy-900">{priceLabel}</p>
-              <p className="text-[11px] text-steel-500">
-                {product.price !== null ? product.currency : "Enquire for pricing"}
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-steel-500">{product.listing_type}</span>
+          <div className="border-t border-navy-100 pt-3">
+            <p className="text-xl font-extrabold tracking-tight text-navy-900">{priceLabel}</p>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -139,8 +154,13 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
               </button>
             ) : (
               <>
+                {wooPurchasable ? (
+                  <button type="button" onClick={onWooCommerceCheckout} className="btn-primary btn-sm flex-1">
+                    Buy Now
+                  </button>
+                ) : null}
                 {purchasable ? (
-                  <button type="button" onClick={onAddToCart} className="btn-primary btn-sm flex-1">
+                  <button type="button" onClick={onAddToCart} className="btn-outline btn-sm flex-1">
                     Add to Cart
                   </button>
                 ) : null}
@@ -151,15 +171,6 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
                 >
                   {product.status === "Sold" ? "Enquire About Similar" : "Enquire Now"}
                 </button>
-                {product.price !== null && product.status !== "Sold" ? (
-                  <button
-                    type="button"
-                    onClick={() => openEnquiry({ mode: "offer", product })}
-                    className="btn-outline btn-sm"
-                  >
-                    Make an Offer
-                  </button>
-                ) : null}
               </>
             )}
           </div>
