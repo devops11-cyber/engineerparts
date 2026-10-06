@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, randomBytes } from "node:crypto";
 import { products as localProducts } from "@/lib/data/products";
 import type {
+  CartTotals,
   CategorySlug,
   ConditionGrade,
   ListingBadge,
@@ -39,6 +40,7 @@ type WooStoreProduct = Omit<
 };
 
 export interface WooOrderInput {
+  customer_id?: number;
   payment_method: "nomod";
   payment_method_title: "Nomod";
   set_paid: false;
@@ -47,6 +49,10 @@ export interface WooOrderInput {
     last_name: string;
     company: string;
     address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
     country: string;
     email: string;
     phone: string;
@@ -56,9 +62,18 @@ export interface WooOrderInput {
     last_name: string;
     company: string;
     address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
     country: string;
   };
   line_items: Array<{ product_id: number; quantity: number }>;
+  shipping_lines?: Array<{
+    method_id: string;
+    method_title: string;
+    total: string;
+  }>;
   customer_note: string;
   meta_data: Array<{ key: string; value: string }>;
 }
@@ -328,6 +343,229 @@ function authorization(config: NonNullable<ReturnType<typeof configuration>>): H
   return {
     Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`,
     "Content-Type": "application/json",
+  };
+}
+
+export interface WooCountry {
+  code: string;
+  name: string;
+}
+
+export async function getWooCommerceCountries(): Promise<WooCountry[]> {
+  const config = configuration();
+  if (!config) return [{ code: "AE", name: "United Arab Emirates" }];
+
+  try {
+    const response = await fetch(`${config.url}/wp-json/wc/v3/data/countries`, {
+      headers: authorization(config),
+      next: { revalidate: 86400 },
+    });
+    if (!response.ok) throw new Error(`Countries request failed (${response.status})`);
+    return (await response.json()) as WooCountry[];
+  } catch {
+    return [{ code: "AE", name: "United Arab Emirates" }];
+  }
+}
+
+interface StoreCartResponse {
+  totals: {
+    total_items: string;
+    total_items_tax: string;
+    total_shipping: string | null;
+    total_shipping_tax: string | null;
+    total_price: string;
+    total_tax: string;
+    currency_code: string;
+    currency_minor_unit: number;
+  };
+  shipping_rates: Array<{
+    name: string;
+    shipping_rates: Array<{
+      rate_id: string;
+      method_id: string;
+      name: string;
+      price: string;
+      selected: boolean;
+    }>;
+  }>;
+}
+
+export interface WooCartQuote extends CartTotals {
+  stockLimits: Array<{ productId: string; maxQuantity: number | null }>;
+  shippingMethod?: {
+    methodId: string;
+    title: string;
+    total: string;
+  };
+}
+
+interface WooShippingMethod {
+  title: string;
+  enabled: boolean;
+  method_id: string;
+  settings?: {
+    requires?: { value?: string };
+    min_amount?: { value?: string };
+    cost?: { value?: string };
+  };
+}
+
+async function getConfiguredShippingMethods(
+  config: NonNullable<ReturnType<typeof configuration>>,
+): Promise<{
+  freeShipping?: { title: string; minimum: number };
+  flatRate?: { methodId: string; title: string; cost: number };
+}> {
+  try {
+    const zonesResponse = await fetch(`${config.url}/wp-json/wc/v3/shipping/zones`, {
+      headers: authorization(config),
+      next: { revalidate: 300 },
+    });
+    if (!zonesResponse.ok) return {};
+    const zones = (await zonesResponse.json()) as Array<{ id: number }>;
+    const methods = (
+      await Promise.all(
+        zones.map(async (zone) => {
+          const response = await fetch(
+            `${config.url}/wp-json/wc/v3/shipping/zones/${zone.id}/methods`,
+            { headers: authorization(config), next: { revalidate: 300 } },
+          );
+          return response.ok ? ((await response.json()) as WooShippingMethod[]) : [];
+        }),
+      )
+    ).flat();
+    const freeShipping = methods.find(
+      (item) =>
+        item.enabled &&
+        item.method_id === "free_shipping" &&
+        ["min_amount", "either", "both"].includes(item.settings?.requires?.value ?? "") &&
+        Number(item.settings?.min_amount?.value) > 0,
+    );
+    const flatRate = methods.find(
+      (item) =>
+        item.enabled &&
+        item.method_id === "flat_rate" &&
+        Number(item.settings?.cost?.value) >= 0,
+    );
+    return {
+      freeShipping: freeShipping
+        ? { title: freeShipping.title, minimum: Number(freeShipping.settings?.min_amount?.value) }
+        : undefined,
+      flatRate: flatRate
+        ? {
+            methodId: flatRate.method_id,
+            title: flatRate.title,
+            cost: Number(flatRate.settings?.cost?.value),
+          }
+        : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export async function getWooCommerceCartQuote(
+  items: Array<{ productId: string; quantity: number }>,
+  country: string,
+): Promise<WooCartQuote> {
+  const config = configuration();
+  if (!config) throw new Error("WooCommerce is not configured");
+
+  const stockResponse = await fetch(
+    `${config.url}/wp-json/wc/v3/products?include=${items.map(({ productId }) => encodeURIComponent(productId)).join(",")}&per_page=100`,
+    { headers: authorization(config), cache: "no-store" },
+  );
+  if (!stockResponse.ok) {
+    throw new Error(`WooCommerce stock request failed (${stockResponse.status})`);
+  }
+  const stockProducts = (await stockResponse.json()) as Array<{
+    id: number;
+    stock_quantity: number | null;
+    stock_status: "instock" | "outofstock" | "onbackorder";
+  }>;
+  const stockLimits = items.map(({ productId }) => {
+    const product = stockProducts.find((candidate) => String(candidate.id) === productId);
+    return {
+      productId,
+      maxQuantity: !product || product.stock_status === "outofstock"
+        ? 0
+        : product.stock_quantity === null
+          ? null
+          : Math.max(0, product.stock_quantity),
+    };
+  });
+  const availableItems = items
+    .map((item) => {
+      const limit = stockLimits.find(({ productId }) => productId === item.productId)?.maxQuantity;
+      return limit === 0 ? null : { ...item, quantity: limit === null ? item.quantity : Math.min(item.quantity, limit ?? item.quantity) };
+    })
+    .filter((item): item is { productId: string; quantity: number } => item !== null);
+
+  const storeApi = `${config.url}/wp-json/wc/store/v1`;
+  const initial = await fetch(`${storeApi}/cart`, { cache: "no-store" });
+  const cartToken = initial.headers.get("cart-token");
+  if (!initial.ok || !cartToken) throw new Error("WooCommerce cart is unavailable");
+
+  const headers = { "Cart-Token": cartToken, "Content-Type": "application/json" };
+  for (const item of availableItems) {
+    const response = await fetch(`${storeApi}/cart/add-item`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: Number(item.productId), quantity: item.quantity }),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Unable to quote product ${item.productId}`);
+  }
+
+  const response = await fetch(`${storeApi}/cart/update-customer`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      billing_address: { country },
+      shipping_address: { country },
+    }),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("WooCommerce could not calculate cart totals");
+
+  const cart = (await response.json()) as StoreCartResponse;
+  const divisor = 10 ** cart.totals.currency_minor_unit;
+  const subtotal = Number(cart.totals.total_items) / divisor;
+  const shippingRate = cart.shipping_rates
+    .flatMap((shipment) => shipment.shipping_rates)
+    .find((rate) => rate.selected) ?? cart.shipping_rates.flatMap((shipment) => shipment.shipping_rates)[0];
+  const configured = shippingRate ? {} : await getConfiguredShippingMethods(config);
+  const fallbackShipping = configured.flatRate;
+  const shipping = shippingRate
+    ? Number(cart.totals.total_shipping ?? 0) / divisor
+    : fallbackShipping?.cost ?? 0;
+  const tax = Number(cart.totals.total_tax) / divisor;
+
+  return {
+    subtotal,
+    shipping,
+    tax,
+    total: shippingRate ? Number(cart.totals.total_price) / divisor : subtotal + shipping + tax,
+    currency: cart.totals.currency_code,
+    shippingLabel: shippingRate?.name ?? fallbackShipping?.title ?? cart.shipping_rates[0]?.name ?? "Shipping",
+    freeShippingRemaining: configured.freeShipping
+      ? Math.max(0, configured.freeShipping.minimum - subtotal)
+      : undefined,
+    freeShippingLabel: configured.freeShipping?.title,
+    stockLimits,
+    shippingMethod: shippingRate
+      ? {
+          methodId: shippingRate.method_id,
+          title: shippingRate.name,
+          total: String(Number(shippingRate.price) / divisor),
+        }
+      : fallbackShipping
+        ? {
+            methodId: fallbackShipping.methodId,
+            title: fallbackShipping.title,
+            total: String(fallbackShipping.cost),
+          }
+      : undefined,
   };
 }
 

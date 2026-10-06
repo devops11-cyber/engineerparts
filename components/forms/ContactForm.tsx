@@ -76,7 +76,7 @@ export function ContactForm() {
 
   if (state === "done") {
     return (
-      <div className="rounded-card border border-emerald-200 bg-emerald-50 p-6">
+      <div role="status" className="rounded-card border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
         <p className="text-lg font-bold text-emerald-900">Enquiry received</p>
         <p className="mt-2 text-sm text-emerald-800">
           Your reference is <span className="font-mono font-semibold">{reference}</span>. The
@@ -97,7 +97,7 @@ export function ContactForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-card border border-navy-100 bg-white p-6 shadow-card">
+    <form onSubmit={onSubmit} className="rounded-card border border-navy-100 bg-white p-4 shadow-card sm:p-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name" required>
           <input className="field" value={form.name} onChange={(e) => update("name", e.target.value)} required />
@@ -109,7 +109,7 @@ export function ContactForm() {
           <input type="email" className="field" value={form.email} onChange={(e) => update("email", e.target.value)} required />
         </Field>
         <Field label="Phone">
-          <input className="field" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
+          <input type="tel" autoComplete="tel" className="field" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
         </Field>
         <Field label="Country">
           <input className="field" value={form.country} onChange={(e) => update("country", e.target.value)} />
@@ -146,12 +146,12 @@ export function ContactForm() {
         </div>
       </div>
       {error ? (
-        <p className="mt-4 rounded-md border border-signal-200 bg-signal-50 px-4 py-3 text-sm font-semibold text-signal-700">
+        <p role="alert" className="mt-4 rounded-md border border-signal-200 bg-signal-50 px-4 py-3 text-sm font-semibold text-signal-700">
           {error}
         </p>
       ) : null}
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={state === "sending"} className="btn-primary">
+        <button type="submit" disabled={state === "sending"} className="btn-primary w-full sm:w-auto">
           {state === "sending" ? "Sending..." : "Send Enquiry"}
         </button>
         <p className="text-[11px] text-steel-500">Used only to respond to this enquiry.</p>

@@ -17,7 +17,7 @@ export function ProductGallery({
   const current = images[active] ?? images[0];
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="relative aspect-[4/3] overflow-hidden rounded-card border border-navy-100 bg-navy-50">
         <Image
           src={current}
@@ -25,7 +25,7 @@ export function ProductGallery({
           fill
           priority
           sizes="(max-width: 1024px) 100vw, 55vw"
-          className="object-cover"
+          className="object-contain p-3 sm:p-5"
         />
         <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-sm bg-navy-950/85 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
@@ -36,7 +36,7 @@ export function ProductGallery({
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-4 gap-3">
+      <div className="no-scrollbar mt-3 flex snap-x gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-visible">
         {images.map((image, index) => (
           <button
             key={`${image}-${index}`}
@@ -45,11 +45,11 @@ export function ProductGallery({
             aria-label={`Show photo ${index + 1}`}
             aria-pressed={active === index}
             className={cn(
-              "relative aspect-[4/3] overflow-hidden rounded-md border bg-navy-50 transition-colors",
+              "relative aspect-[4/3] w-24 shrink-0 snap-start overflow-hidden rounded-md border bg-navy-50 transition-colors sm:w-auto",
               active === index ? "border-brand-600 ring-1 ring-brand-500" : "border-navy-100 hover:border-navy-300",
             )}
           >
-            <Image src={image} alt="" fill sizes="120px" className="object-cover" />
+            <Image src={image} alt="" fill sizes="120px" className="object-contain p-1" />
           </button>
         ))}
       </div>

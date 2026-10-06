@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/cards/ProductCard";
 import { filterProducts } from "@/lib/search";
 import type { Product } from "@/lib/types";
@@ -71,6 +71,13 @@ export function ClearanceBrowser({
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
 
   const activeCount = useMemo(() => {
     let count = 0;
@@ -274,7 +281,7 @@ export function ClearanceBrowser({
       </aside>
 
       <div>
-        <div className="flex flex-col gap-3 rounded-card border border-navy-100 bg-white p-4 shadow-card sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 rounded-card border border-navy-100 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:p-4">
           <div className="relative flex-1">
             <input
               value={query}
@@ -308,7 +315,7 @@ export function ClearanceBrowser({
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="btn-outline btn-sm lg:hidden"
+              className="btn-outline btn-sm w-full sm:w-auto lg:hidden"
             >
               Filters{activeCount ? ` (${activeCount})` : ""}
             </button>
@@ -366,7 +373,7 @@ export function ClearanceBrowser({
         ) : null}
 
         {results.length === 0 ? (
-          <div className="mt-8 rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-10 text-center">
+          <div className="mt-8 rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-6 text-center sm:p-10">
             <p className="text-base font-bold text-navy-900">No clearance stock matches those filters</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-steel-600">
               Try widening your filters or clearing the search. You can also send us an enquiry.
@@ -402,7 +409,12 @@ export function ClearanceBrowser({
             className="absolute inset-0 bg-navy-950/50"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-[88%] max-w-sm overflow-y-auto bg-white p-5">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Product filters"
+            className="absolute inset-y-0 left-0 w-[92%] max-w-sm overflow-y-auto overscroll-contain bg-white p-4 shadow-lift sm:p-5"
+          >
             <div className="mb-4 flex items-center justify-between">
               <p className="text-base font-bold text-navy-900">Filters</p>
               <button

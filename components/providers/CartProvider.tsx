@@ -1,15 +1,25 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { CartItem } from "@/lib/types";
+import type { CartItem, CartTotals } from "@/lib/types";
 import { track } from "@/lib/analytics";
 
 interface CartContextValue {
   items: CartItem[];
   count: number;
   subtotal: number;
+  shipping: number;
+  tax: number;
   total: number;
+  shippingLabel: string;
+  freeShippingRemaining?: number;
+  freeShippingLabel?: string;
+  quoteLoading: boolean;
+  quoteError: boolean;
+  quoteCountry: string;
+  setQuoteCountry: (country: string) => void;
   ready: boolean;
+  stockValid: boolean;
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   removeItem: (productId: string) => void;
@@ -23,6 +33,10 @@ const STORAGE_KEY = "engineerparts.cart.v2";
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
+  const [quote, setQuote] = useState<CartTotals | null>(null);
+  const [quoteCountry, setQuoteCountry] = useState("AE");
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState(false);
 
   useEffect(() => {
     try {
@@ -42,6 +56,65 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       void 0;
     }
   }, [items, ready]);
+
+  useEffect(() => {
+    if (!ready || !items.length) {
+      setQuote(null);
+      setQuoteLoading(false);
+      setQuoteError(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setQuote(null);
+    setQuoteLoading(true);
+    setQuoteError(false);
+    fetch("/api/cart/totals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        country: quoteCountry,
+        items: items.map(({ productId, quantity }) => ({ productId, quantity })),
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to calculate totals");
+        const nextQuote = (await response.json()) as CartTotals;
+        setQuote(nextQuote);
+        if (nextQuote.stockLimits) {
+          setItems((current) => {
+            let changed = false;
+            const next = current.map((line) => {
+              const stock = nextQuote.stockLimits?.find(({ productId }) => productId === line.productId);
+              if (!stock || stock.maxQuantity === null) return line;
+              const quantity = stock.maxQuantity > 0
+                ? Math.min(line.quantity, stock.maxQuantity)
+                : line.quantity;
+              if (line.maxQuantity === stock.maxQuantity && line.quantity === quantity) return line;
+              changed = true;
+              return {
+                ...line,
+                maxQuantity: stock.maxQuantity,
+                quantity,
+              };
+            });
+            return changed ? next : current;
+          });
+        }
+      })
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setQuote(null);
+          setQuoteError(true);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setQuoteLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [items, quoteCountry, ready]);
 
   const addItem = useCallback((item: Omit<CartItem, "quantity">, quantity = 1) => {
     setItems((current) => {
@@ -92,13 +165,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<CartContextValue>(() => {
     const count = items.reduce((sum, line) => sum + line.quantity, 0);
-    const subtotal = items.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+    const localSubtotal = items.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+    const subtotal = quote?.subtotal ?? localSubtotal;
+    const stockValid = Boolean(quote?.stockLimits) &&
+      items.every((line) => line.maxQuantity > 0 && line.quantity <= line.maxQuantity);
     return {
       items,
       count,
       subtotal,
-      total: subtotal,
+      shipping: quote?.shipping ?? 0,
+      tax: quote?.tax ?? 0,
+      total: quote?.total ?? localSubtotal,
+      shippingLabel: quote?.shippingLabel ?? "Shipping",
+      freeShippingRemaining: quote?.freeShippingRemaining,
+      freeShippingLabel: quote?.freeShippingLabel,
+      quoteLoading,
+      quoteError,
+      quoteCountry,
+      setQuoteCountry,
       ready,
+      stockValid,
       addItem,
       updateQuantity,
       removeItem,
@@ -106,7 +192,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       quantityFor: (productId: string) =>
         items.find((line) => line.productId === productId)?.quantity ?? 0,
     };
-  }, [items, ready, addItem, updateQuantity, removeItem, clear]);
+  }, [items, quote, quoteCountry, quoteLoading, quoteError, ready, addItem, updateQuantity, removeItem, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

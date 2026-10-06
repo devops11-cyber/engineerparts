@@ -65,7 +65,7 @@ const EVENT_BY_TYPE: Record<LeadType, "enquiry_submit" | "whole_lot_enquiry" | "
 };
 
 export async function submitLead(input: LeadInput): Promise<Lead> {
-  const lead: Lead = {
+  const draft: Lead = {
     lead_id: makeLeadId(),
     lead_type: input.lead_type,
     product_id: input.product_id,
@@ -88,24 +88,15 @@ export async function submitLead(input: LeadInput): Promise<Lead> {
     created_at: new Date().toISOString(),
   };
 
-  persist(lead);
-  track(EVENT_BY_TYPE[input.lead_type], {
-    lead_id: lead.lead_id,
-    sku: lead.sku,
-    lot_id: lead.lot_id,
-    equipment_id: lead.equipment_id,
-    quantity: lead.quantity,
+  const response = await fetch("/api/leads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(draft),
   });
-
-  try {
-    await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(lead),
-    });
-  } catch {
-    void 0;
-  }
-
+  const result = (await response.json()) as { lead_id?: string; received_at?: string; error?: string };
+  if (!response.ok || !result.lead_id) throw new Error(result.error || "Unable to submit your enquiry.");
+  const lead = { ...draft, lead_id: result.lead_id, created_at: result.received_at ?? draft.created_at };
+  persist(lead);
+  track(EVENT_BY_TYPE[input.lead_type], { lead_id: lead.lead_id, sku: lead.sku, lot_id: lead.lot_id, equipment_id: lead.equipment_id, quantity: lead.quantity });
   return lead;
 }

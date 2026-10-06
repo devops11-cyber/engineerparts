@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/components/providers/CartProvider";
 import { useEnquiry } from "@/components/providers/EnquiryProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { SaveProductButton } from "@/components/account/SaveProductButton";
 import { ConditionPill, ListingBadges, StatusPill } from "@/components/ui/Badge";
 import type { Product } from "@/lib/types";
 import { cn, formatNumber, formatPrice, isPurchasable, relativeAdded } from "@/lib/utils";
@@ -14,13 +15,13 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
   const { openEnquiry } = useEnquiry();
   const { toast } = useToast();
 
-  const purchasable = isPurchasable(product.status) && product.price !== null && product.quantity_available !== null && product.quantity_available > 0;
+  const purchasable = isPurchasable(product.status) && product.price !== null && (product.quantity_available ?? 1) > 0;
   const wooPurchasable = isPurchasable(product.status) && product.price !== null && Boolean(product.woocommerce_checkout_url);
   const priceLabel = formatPrice(product.price, product.currency);
   const list = layout === "list";
 
   function onAddToCart() {
-    if (!purchasable || product.price === null || product.quantity_available === null) return;
+    if (!purchasable || product.price === null) return;
     addItem(
       {
         productId: product.id,
@@ -31,7 +32,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
         condition: product.condition,
         unitPrice: product.price,
         currency: product.currency,
-        maxQuantity: product.quantity_available,
+        maxQuantity: product.quantity_available ?? 99,
         image: product.images[0],
         warehouse: product.warehouse_location,
       },
@@ -65,6 +66,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
         list ? "flex-col sm:flex-row" : "h-full flex-col",
       )}
     >
+      <SaveProductButton productId={product.id} compact className="absolute right-3 top-3 z-10" />
       <Link
         href={`/product/${product.slug}`}
         className={cn(
@@ -79,7 +81,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            className="object-contain p-2 transition-transform duration-500 group-hover:scale-[1.03]"
           />
           {product.status === "Sold" ? (
             <div className="absolute inset-0 flex items-center justify-center bg-navy-950/55">
@@ -100,7 +102,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
           <StatusPill status={product.status} />
         </div>
 
-        <h3 className={cn("mt-2 font-bold leading-snug text-navy-900", list ? "text-lg" : "text-[15px]")}>
+        <h3 className={cn("mt-2 line-clamp-2 font-bold leading-snug text-navy-900", list ? "text-lg" : "min-h-10 text-[15px]")}>
           <Link href={`/product/${product.slug}`} className="hover:text-brand-700">
             {product.name}
           </Link>
@@ -143,31 +145,31 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
             <p className="text-xl font-extrabold tracking-tight text-navy-900">{priceLabel}</p>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
             {product.listing_type === "Whole Lot" ? (
               <button
                 type="button"
                 onClick={() => openEnquiry({ mode: "lot", product })}
-                className="btn-primary btn-sm flex-1"
+                className="btn-primary btn-sm"
               >
                 Enquire for Whole Lot
               </button>
             ) : (
               <>
-                {wooPurchasable ? (
-                  <button type="button" onClick={onWooCommerceCheckout} className="btn-primary btn-sm flex-1">
-                    Buy Now
+                {purchasable ? (
+                  <button type="button" onClick={onAddToCart} className="btn-outline btn-sm">
+                    Add to Cart
                   </button>
                 ) : null}
-                {purchasable ? (
-                  <button type="button" onClick={onAddToCart} className="btn-outline btn-sm flex-1">
-                    Add to Cart
+                {wooPurchasable ? (
+                  <button type="button" onClick={onWooCommerceCheckout} className="btn-primary btn-sm min-[380px]:col-start-2">
+                    Buy Now
                   </button>
                 ) : null}
                 <button
                   type="button"
                   onClick={() => openEnquiry({ mode: "product", product })}
-                  className={cn("btn-sm", purchasable ? "btn-outline" : "btn-navy flex-1")}
+                  className={cn("btn-sm min-[380px]:col-span-2", purchasable ? "btn-outline" : "btn-navy")}
                 >
                   {product.status === "Sold" ? "Enquire About Similar" : "Enquire Now"}
                 </button>

@@ -12,7 +12,7 @@ export function Footer() {
 
   return (
     <footer className="border-t border-navy-800 bg-navy-950 text-steel-300">
-      <div className="shell py-14">
+      <div className="shell py-10 sm:py-14">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(2,1fr)]">
           <div>
             <Logo light />
@@ -78,7 +78,7 @@ export function Footer() {
 function FooterColumn({ title, links }: { title: string; links: { label: string; href: string }[] }) {
   return (
     <div>
-      <p className="eyebrow text-white">{title}</p>
+      <h2 className="eyebrow text-white">{title}</h2>
       <ul className="mt-4 space-y-2.5 text-sm">
         {links.map((link) => (
           <li key={`${link.href}-${link.label}`}>

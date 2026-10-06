@@ -186,6 +186,18 @@ export interface CartLine {
 
 export type CartItem = CartLine;
 
+export interface CartTotals {
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  currency: string;
+  shippingLabel: string;
+  freeShippingRemaining?: number;
+  freeShippingLabel?: string;
+  stockLimits?: Array<{ productId: string; maxQuantity: number | null }>;
+}
+
 export interface AnalyticsEvent {
   name: string;
   payload?: Record<string, unknown>;

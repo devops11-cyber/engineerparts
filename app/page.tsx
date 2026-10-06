@@ -53,8 +53,8 @@ export default async function HomePage() {
   return (
     <>
       <section className="border-b border-navy-100 bg-white">
-        <div className="shell grid items-stretch gap-10 py-12 lg:grid-cols-2 lg:gap-14 lg:py-16">
-          <div className="flex flex-col justify-center">
+        <div className="shell grid grid-cols-[minmax(0,1fr)] items-stretch gap-10 py-12 lg:grid-cols-2 lg:gap-14 lg:py-16">
+          <div className="min-w-0 flex flex-col justify-center">
             <p className="eyebrow text-brand-600">Engineerparts.com &middot; Product catalogue</p>
             <h1 className="mt-4 text-[34px] font-extrabold leading-[1.05] tracking-tight text-navy-900 sm:text-5xl lg:text-[54px]">
               Industrial products.

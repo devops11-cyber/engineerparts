@@ -18,7 +18,7 @@ interface SearchBarProps {
 
 export function SearchBar({
   variant = "header",
-  placeholder = "Search by brand, part number, model or product...",
+  placeholder = "Search by product, SKU, part number, brand or manufacturer",
   initialQuery = "",
   autoFocus = false,
   onNavigate,
@@ -148,6 +148,10 @@ export function SearchBar({
           autoComplete="off"
           placeholder={placeholder}
           aria-label="Search clearance stock"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open && Boolean(groups)}
+          aria-controls="search-suggestions"
           className={[
             "min-w-0 flex-1 bg-transparent px-3 text-navy-900 placeholder:text-steel-400 focus:outline-none",
             hero ? "py-4 text-base" : "py-3 text-sm",
@@ -156,8 +160,8 @@ export function SearchBar({
         <button
           type="submit"
           className={[
-            "shrink-0 bg-brand-600 font-semibold text-white transition-colors hover:bg-brand-700",
-            hero ? "px-6 text-sm" : "px-5 text-sm",
+            "min-h-11 shrink-0 bg-brand-600 font-semibold text-white transition-colors hover:bg-brand-700",
+            hero ? "px-4 text-sm sm:px-6" : "px-3 text-sm sm:px-5",
           ].join(" ")}
         >
           Search
@@ -165,7 +169,11 @@ export function SearchBar({
       </form>
 
       {open && groups ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[70vh] animate-fade-in overflow-y-auto rounded-md border border-navy-100 bg-white shadow-lift">
+        <div
+          id="search-suggestions"
+          role="listbox"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[min(70vh,32rem)] animate-fade-in overflow-x-hidden overflow-y-auto overscroll-contain rounded-md border border-navy-100 bg-white shadow-lift"
+        >
           {flat.length === 0 ? (
             <div className="px-5 py-6 text-sm text-steel-600">
               <p className="font-semibold text-navy-900">No matching clearance stock</p>
@@ -190,7 +198,7 @@ export function SearchBar({
                         onNavigate?.();
                       }}
                       className={[
-                        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-navy-50",
+                        "flex min-h-14 items-center gap-3 px-3 py-3 transition-colors hover:bg-navy-50 sm:px-4",
                         activeIndex === index ? "bg-navy-50" : "",
                       ].join(" ")}
                     >
@@ -203,7 +211,7 @@ export function SearchBar({
                           {hit.brand} &middot; {hit.reference} &middot; {hit.condition}
                         </span>
                       </span>
-                      <span className="shrink-0 text-right">
+                      <span className="hidden shrink-0 text-right sm:block">
                         <span className="block text-sm font-bold text-navy-900">{formatPrice(hit.price, hit.currency)}</span>
                         <span className="block text-[11px] text-steel-500">
                           {hit.quantity === null ? "Contact for quantity" : `${hit.quantity} available`}
@@ -304,7 +312,7 @@ function SuggestionRow({
   onClick: () => void;
 }) {
   return (
-    <Link href={href} onClick={onClick} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-navy-50">
+    <Link href={href} onClick={onClick} className="flex min-h-14 items-center gap-3 px-3 py-3 transition-colors hover:bg-navy-50 sm:px-4">
       <span className="relative h-12 w-14 shrink-0 overflow-hidden rounded border border-navy-100 bg-navy-50">
         <Image src={image} alt="" fill sizes="56px" className="object-cover" />
       </span>
@@ -312,7 +320,7 @@ function SuggestionRow({
         <span className="block truncate text-sm font-semibold text-navy-900">{title}</span>
         <span className="mt-0.5 block truncate text-xs text-steel-500">{meta}</span>
       </span>
-      <span className="shrink-0 text-sm font-bold text-navy-900">{price}</span>
+      <span className="hidden shrink-0 text-sm font-bold text-navy-900 sm:block">{price}</span>
     </Link>
   );
 }

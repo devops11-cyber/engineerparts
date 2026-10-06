@@ -10,6 +10,7 @@ Engineerparts is a responsive industrial marketplace built with Next.js. It prov
 - Tailwind CSS
 - WooCommerce product catalog
 - Browser `localStorage` for the cart and client-side enquiry history
+- WordPress/WooCommerce customer authentication through secure server-side proxying
 
 ## Prerequisites
 
@@ -60,14 +61,38 @@ WooCommerce configuration is required to display products. Without it, the produ
 
   ```env
   WOOCOMMERCE_URL=https://your-wordpress-site.azurewebsites.net
+  WORDPRESS_URL=https://your-wordpress-site.azurewebsites.net
   WOOCOMMERCE_CONSUMER_KEY=ck_your_consumer_key
   WOOCOMMERCE_CONSUMER_SECRET=cs_your_consumer_secret
+  ENGINEERPARTS_PROXY_SECRET=generate_at_least_32_random_characters
   NEXT_PUBLIC_WHATSAPP_NUMBER=
   ```
 
 5. Restart `npm run dev` after changing environment variables.
 
 The app fetches all published WooCommerce products in pages of 100 and caches responses for five minutes. Keys are read only by server code and are never sent to the browser. HTTPS stores use Basic Authentication; local HTTP stores use OAuth 1.0 request signing as required by WooCommerce. If the authenticated REST API rejects the key, the app falls back to WooCommerce's public Store API and still displays published products. Create the REST API key for an Administrator or Shop Manager user to expose custom metadata and create checkout orders. Product currency is read from WooCommerce's Store API. `NEXT_PUBLIC_WHATSAPP_NUMBER` is optional; omit it to hide direct WhatsApp buttons.
+
+### Customer accounts
+
+Customer authentication uses the dedicated plugin in `wordpress-plugin/engineerparts-account`. Install it on WordPress and follow its README before enabling account registration in production. The confirmed production mapping is:
+
+- Next.js: `https://engineerparts.com`
+- WordPress/WooCommerce: `https://shop.engineerparts.com`
+
+Use the same `ENGINEERPARTS_PROXY_SECRET` value in the Next.js environment and WordPress `wp-config.php`. The value must contain at least 32 random characters. It must never use a `NEXT_PUBLIC_` prefix.
+
+The plugin uses WooCommerce customers, WordPress password handling, required email verification, WordPress-native reset keys, and revocable opaque sessions. No JWT plugin or separate customer database is required. Configure reliable WordPress SMTP/email delivery before launch; registration verification and password reset depend on `wp_mail`.
+
+Required WordPress configuration:
+
+1. Enable WooCommerce customer account creation.
+2. Keep guest checkout enabled unless the business intentionally changes that policy.
+3. Enable pretty permalinks.
+4. Install and activate WooCommerce, then activate the EngineerParts plugin.
+5. Retain the existing least-privilege WooCommerce REST API key for catalog/order operations.
+6. Configure and test transactional email delivery.
+7. Serve both applications over HTTPS.
+8. Do not expose WordPress account endpoints through browser CORS; Next.js proxies them server-side.
 
 ### Connect Nomod payments
 
@@ -153,8 +178,16 @@ npm run lint
 | `/recently-added` | Recently added inventory |
 | `/cart` | Shopping cart |
 | `/checkout` | Checkout form |
-| `/my-enquiries` | Enquiries saved in this browser |
-| `/account` | Account overview |
+| `/my-enquiries` | Redirects to the protected account enquiry history |
+| `/login`, `/register` | WooCommerce customer authentication |
+| `/forgot-password`, `/reset-password` | WordPress password recovery |
+| `/account` | Protected customer dashboard |
+| `/account/orders` | Customer-owned WooCommerce orders |
+| `/account/enquiries` | Persistent customer enquiries and RFQs |
+| `/account/saved-products` | Products saved to the customer account |
+| `/account/addresses` | WooCommerce billing and shipping addresses |
+| `/account/profile` | Customer and B2B profile details |
+| `/account/security` | Password and active-session security |
 | `/about` | About Engineerparts |
 | `/contact` | Contact form |
 
@@ -162,13 +195,15 @@ npm run lint
 
 | Endpoint | Methods | Current behavior |
 | --- | --- | --- |
-| `/api/leads` | `GET`, `POST` | Accepts and lists enquiries in temporary server memory |
+| `/api/leads` | `POST` | Persists guest or customer-linked enquiries in WordPress |
 | `/api/orders` | `POST` | Creates a pending WooCommerce order and returns its secure payment-page URL |
+| `/api/auth/[action]` | `GET`, `POST` | Proxies controlled WordPress authentication operations |
+| `/api/account/*` | `GET`, `POST`, `PUT` | Proxies authenticated customer-owned account resources |
 | `/api/analytics` | `GET`, `POST` | Records and reports temporary page-view data |
 | `/api/search` | `GET` | Returns WooCommerce product and brand suggestions |
 | `/api/import` | `GET`, `POST` | Documents the reserved future catalog-import contract |
 
-The lead and analytics API stores are prototypes. Their contents are lost whenever the Next.js server restarts and may not be shared between serverless instances.
+Analytics storage remains a prototype. Enquiries are persisted as private WordPress `engineerparts_enquiry` posts and associated with authenticated WooCommerce customer IDs.
 
 ## Project structure
 

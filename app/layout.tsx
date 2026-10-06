@@ -7,6 +7,8 @@ import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { CartProvider } from "@/components/providers/CartProvider";
 import { EnquiryProvider } from "@/components/providers/EnquiryProvider";
 import { ToastProvider } from "@/components/providers/ToastProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
+import { SavedProductsProvider } from "@/components/providers/SavedProductsProvider";
 import { EnquiryModal } from "@/components/modals/EnquiryModal";
 
 const inter = Inter({
@@ -42,15 +44,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-AE" className={`${inter.variable} ${archivo.variable}`}>
       <body className="flex min-h-screen flex-col bg-white">
         <ToastProvider>
-          <CartProvider>
-            <EnquiryProvider>
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-              <FloatingWhatsApp />
-              <EnquiryModal />
-            </EnquiryProvider>
-          </CartProvider>
+          <AuthProvider>
+            <SavedProductsProvider>
+              <CartProvider>
+                <EnquiryProvider>
+                  <Header />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                  <FloatingWhatsApp />
+                  <EnquiryModal />
+                </EnquiryProvider>
+              </CartProvider>
+            </SavedProductsProvider>
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>

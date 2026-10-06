@@ -185,12 +185,12 @@ export function EnquiryModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-navy-950/60 p-4 sm:items-center">
-      <div className="relative w-full max-w-2xl animate-fade-up rounded-card border border-navy-100 bg-white shadow-lift">
-        <div className="flex items-start justify-between gap-4 border-b border-navy-100 p-5">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center overflow-y-auto bg-navy-950/60 sm:items-center sm:p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="enquiry-title" className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl animate-fade-up flex-col overflow-hidden rounded-t-card border border-navy-100 bg-white shadow-lift sm:max-h-[calc(100dvh-2rem)] sm:rounded-card">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-navy-100 p-4 sm:p-5">
           <div>
             <p className="eyebrow text-brand-600">Enquiry</p>
-            <h2 className="mt-1 text-xl font-extrabold text-navy-900">{headline}</h2>
+            <h2 id="enquiry-title" className="mt-1 text-xl font-extrabold text-navy-900">{headline}</h2>
             {contextLabel ? <p className="mt-1 text-sm text-steel-600">{contextLabel}</p> : null}
           </div>
           <button
@@ -206,7 +206,7 @@ export function EnquiryModal() {
         </div>
 
         {submitted ? (
-          <div className="p-6">
+          <div className="overflow-y-auto p-4 sm:p-6">
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-5">
               <p className="text-base font-bold text-emerald-900">Enquiry received</p>
               <p className="mt-1.5 text-sm text-emerald-800">
@@ -249,7 +249,7 @@ export function EnquiryModal() {
             </div>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="p-5">
+          <form onSubmit={onSubmit} className="overflow-y-auto p-4 sm:p-5">
             {product ? (
               <ContextPanel
                 rows={[
@@ -326,6 +326,7 @@ export function EnquiryModal() {
               </Field>
               <Field label="Phone">
                 <input
+                  type="tel"
                   className="field"
                   value={form.phone}
                   onChange={(e) => update("phone", e.target.value)}
@@ -415,16 +416,16 @@ export function EnquiryModal() {
             </div>
 
             {error ? (
-              <p className="mt-4 rounded-md border border-signal-200 bg-signal-50 px-4 py-3 text-sm font-semibold text-signal-700">
+              <p role="alert" className="mt-4 rounded-md border border-signal-200 bg-signal-50 px-4 py-3 text-sm font-semibold text-signal-700">
                 {error}
               </p>
             ) : null}
 
-            <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-navy-100 pt-4">
-              <button type="submit" disabled={submitting} className="btn-primary">
+            <div className="mt-5 grid gap-3 border-t border-navy-100 pt-4 sm:flex sm:flex-wrap sm:items-center">
+              <button type="submit" disabled={submitting} className="btn-primary w-full sm:w-auto">
                 {submitting ? "Submitting..." : "Submit Enquiry"}
               </button>
-              <button type="button" onClick={closeEnquiry} className="btn-outline">
+              <button type="button" onClick={closeEnquiry} className="btn-outline w-full sm:w-auto">
                 Cancel
               </button>
               <p className="text-[11px] leading-relaxed text-steel-500">

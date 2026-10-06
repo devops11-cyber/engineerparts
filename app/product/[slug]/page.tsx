@@ -74,12 +74,12 @@ export default async function ProductPage({ params }: { params: { slug: string }
       </section>
 
       <section className="section pt-8">
-        <div className="shell grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-          <div>
+        <div className="shell grid grid-cols-[minmax(0,1fr)] gap-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-10">
+          <div className="min-w-0">
             <ProductGallery images={product.images} alt={product.name} />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <ListingBadges badges={product.badges} />
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Link
@@ -96,7 +96,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
               {product.name}
             </h1>
 
-            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-navy-100 bg-white p-4 text-xs shadow-card">
+            <dl className="mt-5 grid grid-cols-1 gap-x-4 gap-y-3 rounded-card border border-navy-100 bg-white p-4 text-xs shadow-card min-[380px]:grid-cols-2">
               <Meta label="SKU" value={product.sku} />
               <Meta label="Manufacturer part number" value={product.part_number} />
               <Meta label="Model" value={product.model} />

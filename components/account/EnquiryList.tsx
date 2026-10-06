@@ -19,7 +19,7 @@ export function EnquiryList() {
 
   if (!leads.length) {
     return (
-      <div className="rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-10 text-center">
+      <div className="rounded-card border border-dashed border-navy-200 bg-navy-50/60 p-6 text-center sm:p-10">
         <p className="text-lg font-bold text-navy-900">No enquiries yet</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-steel-600">
           When you enquire or request a whole lot, the reference will appear here.
@@ -32,7 +32,7 @@ export function EnquiryList() {
   }
 
   return (
-    <div className="overflow-x-auto rounded-card border border-navy-100 bg-white">
+    <div role="region" aria-label="Enquiries table, scroll horizontally for more columns" tabIndex={0} className="overflow-x-auto rounded-card border border-navy-100 bg-white">
       <table className="min-w-full text-sm">
         <thead className="bg-navy-900 text-left text-[11px] font-bold uppercase tracking-wide text-white">
           <tr>

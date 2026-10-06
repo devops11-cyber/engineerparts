@@ -1,0 +1,6 @@
+import Link from "next/link";
+import { ProductCard } from "@/components/cards/ProductCard";
+import { getAccountResource } from "@/lib/auth-server";
+import { getProducts } from "@/lib/woocommerce";
+
+export default async function SavedProductsPage() { const [data, products] = await Promise.all([getAccountResource<{ ok: true; productIds: number[] }>("saved-products"), getProducts()]); const ids = new Set(data?.productIds.map(String) ?? []); const saved = products.filter((product) => ids.has(product.id)); return <div><h2 className="text-xl font-extrabold">Saved products</h2><p className="mt-1 text-sm text-steel-600">Products saved to your WooCommerce customer account.</p>{saved.length ? <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{saved.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="card mt-5 border-dashed p-8 text-center"><h2 className="text-lg font-extrabold">No saved products yet.</h2><Link href="/clearance" className="btn-primary mt-5">Explore Products</Link></div>}</div>; }

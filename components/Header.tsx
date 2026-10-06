@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo";
 import { SearchBar } from "@/components/SearchBar";
 import { useCart } from "@/components/providers/CartProvider";
 import { useEnquiry } from "@/components/providers/EnquiryProvider";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { primaryNav } from "@/lib/nav";
 import { track } from "@/lib/analytics";
 import { WHATSAPP_NUMBER, cn, whatsappLink } from "@/lib/utils";
@@ -15,13 +16,16 @@ export function Header() {
   const pathname = usePathname();
   const { count } = useCart();
   const { openEnquiry } = useEnquiry();
+  const { authenticated, customer, loading, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
     setCategoriesOpen(false);
+    setAccountOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -42,6 +46,8 @@ export function Header() {
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  const accountHref = authenticated ? "/account" : "/login";
+  const accountLabel = loading ? "Account" : authenticated ? customer?.firstName || "My Account" : "Login / Account";
 
   function onWhatsApp(context = "General enquiry") {
     track("whatsapp_click", { source: context });
@@ -59,8 +65,8 @@ export function Header() {
           scrolled && "shadow-header",
         )}
       >
-        <div className="shell flex items-center gap-4 py-3 lg:gap-6">
-          <div className="lg:hidden">
+        <div className="shell flex min-w-0 items-center gap-2 py-3 sm:gap-4 lg:gap-6">
+          <div className="min-w-0 flex-1 lg:hidden">
             <Logo compact />
           </div>
           <div className="hidden lg:block">
@@ -72,12 +78,6 @@ export function Header() {
           </div>
 
           <div className="ml-auto flex items-center gap-1 lg:gap-2">
-            <HeaderAction
-              href="/account"
-              label="Account"
-              icon={<UserIcon />}
-              className="hidden xl:flex"
-            />
             <HeaderAction
               href="/my-enquiries"
               label="My Enquiries"
@@ -100,17 +100,19 @@ export function Header() {
               <WhatsAppIcon />
               <span className="text-xs font-semibold">WhatsApp</span>
             </button> : null}
-            <button
-              type="button"
-              onClick={() => openEnquiry({ mode: "bulk", heading: "Sell / Enquire a Lot" })}
-              className="btn-signal btn-sm hidden lg:inline-flex"
+            {authenticated ? <div className="relative hidden lg:block" onMouseEnter={() => setAccountOpen(true)} onMouseLeave={() => setAccountOpen(false)}><button type="button" onClick={() => setAccountOpen((open) => !open)} className="btn-signal btn-sm min-w-28" aria-expanded={accountOpen}><UserIcon /><span className="max-w-28 truncate">{accountLabel}</span></button>{accountOpen ? <div className="absolute right-0 top-full z-50 w-52 rounded-b-md border border-navy-100 bg-white p-2 shadow-lift"><AccountMenuLink href="/account">Dashboard</AccountMenuLink><AccountMenuLink href="/account/orders">Orders</AccountMenuLink><AccountMenuLink href="/account/enquiries">Enquiries</AccountMenuLink><AccountMenuLink href="/account/saved-products">Saved Products</AccountMenuLink><AccountMenuLink href="/account/profile">Profile</AccountMenuLink><button type="button" onClick={() => void logout()} className="block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-signal-700 hover:bg-navy-50">Sign out</button></div> : null}</div> : <Link href="/login" className="btn-signal btn-sm hidden min-w-28 lg:inline-flex"><UserIcon /><span>Login / Account</span></Link>}
+
+            <Link
+              href={accountHref}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200 text-navy-800 lg:hidden"
+              aria-label={authenticated ? "My account" : "Sign in or create account"}
             >
-              Sell / Enquire a Lot
-            </button>
+              <UserIcon />
+            </Link>
 
             <Link
               href="/cart"
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200 text-navy-800 sm:hidden"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200 text-navy-800 lg:hidden"
               aria-label={`Cart, ${count} items`}
             >
               <CartIcon />
@@ -218,35 +220,45 @@ export function Header() {
             className="absolute inset-0 bg-navy-950/50"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute right-0 top-0 h-full w-[86%] max-w-sm overflow-y-auto bg-white pb-24">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main navigation"
+            className="absolute right-0 top-0 h-full w-[88%] max-w-sm overflow-y-auto bg-white pb-24 shadow-lift"
+          >
             <div className="flex items-center justify-between border-b border-navy-100 px-4 py-3">
               <Logo compact />
-              {WHATSAPP_NUMBER ? <button
+              <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-navy-200"
                 aria-label="Close menu"
               >
                 <CloseIcon />
-              </button> : null}
+              </button>
             </div>
 
             <div className="px-4 py-3">
               <div className="grid grid-cols-2 gap-2">
-                <Link href="/account" className="btn-outline btn-sm justify-start">
-                  <UserIcon /> Account
+                <Link href={accountHref} className="btn-outline btn-sm justify-start">
+                  <UserIcon /> {authenticated ? "Dashboard" : "Login / Account"}
                 </Link>
                 <Link href="/my-enquiries" className="btn-outline btn-sm justify-start">
                   <InboxIcon /> My Enquiries
                 </Link>
               </div>
-              <button
-                type="button"
-                onClick={() => onWhatsApp("Mobile menu")}
-                className="btn btn-sm mt-2 w-full bg-emerald-500 text-white hover:bg-emerald-600"
-              >
-                <WhatsAppIcon /> WhatsApp Us
-              </button>
+              {authenticated ? (
+                <div className="mt-2 grid grid-cols-2 gap-2"><Link href="/account/orders" className="btn-outline btn-sm justify-start">Orders</Link><Link href="/account/enquiries" className="btn-outline btn-sm justify-start">Enquiries</Link><Link href="/account/saved-products" className="btn-outline btn-sm justify-start">Saved</Link><button type="button" onClick={() => void logout()} className="btn-outline btn-sm justify-start text-signal-700">Sign out</button></div>
+              ) : null}
+              {WHATSAPP_NUMBER ? (
+                <button
+                  type="button"
+                  onClick={() => onWhatsApp("Mobile menu")}
+                  className="btn btn-sm mt-2 w-full bg-emerald-500 text-white hover:bg-emerald-600"
+                >
+                  <WhatsAppIcon /> WhatsApp Us
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -289,6 +301,10 @@ export function Header() {
       ) : null}
     </>
   );
+}
+
+function AccountMenuLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return <Link href={href} className="block rounded-md px-3 py-2 text-sm font-semibold text-navy-800 hover:bg-navy-50">{children}</Link>;
 }
 
 function HeaderAction({

@@ -5,6 +5,7 @@ import { useCart } from "@/components/providers/CartProvider";
 import { useEnquiry } from "@/components/providers/EnquiryProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
+import { SaveProductButton } from "@/components/account/SaveProductButton";
 import type { Product } from "@/lib/types";
 import {
   absoluteUrl,
@@ -133,6 +134,7 @@ export function ProductActions({ product }: { product: Product }) {
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <SaveProductButton productId={product.id} className="sm:col-span-2" />
         {wooPurchasable ? (
           <button type="button" onClick={onWooCommerceCheckout} className="btn-primary sm:col-span-2">
             Buy Now with WooCommerce
