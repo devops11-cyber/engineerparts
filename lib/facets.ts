@@ -1,4 +1,5 @@
 import type { Product } from "@/lib/types";
+import { isPublicProductValue } from "@/lib/utils";
 
 export interface BrowserFacets {
   brands: string[];
@@ -13,7 +14,7 @@ export interface BrowserFacets {
 }
 
 function unique(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(values.filter((value) => isPublicProductValue(value)))).sort((a, b) => a.localeCompare(b));
 }
 
 export function buildFacets(items: Product[]): BrowserFacets {
@@ -22,7 +23,7 @@ export function buildFacets(items: Product[]): BrowserFacets {
   const max = priced.length ? Math.ceil(Math.max(...priced)) : 0;
 
   return {
-    brands: unique(items.map((p) => p.brand)),
+    brands: unique(items.map((p) => p.brand).filter((brand) => isPublicProductValue(brand, "brand"))),
     manufacturers: unique(items.map((p) => p.manufacturer)),
     categories: unique(items.map((p) => p.category)).map((slug) => ({
       slug,

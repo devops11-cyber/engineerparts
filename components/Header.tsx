@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { SearchBar } from "@/components/SearchBar";
 import { useCart } from "@/components/providers/CartProvider";
-import { useEnquiry } from "@/components/providers/EnquiryProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { primaryNav } from "@/lib/nav";
 import { track } from "@/lib/analytics";
@@ -15,18 +14,41 @@ import { WHATSAPP_NUMBER, cn, whatsappLink } from "@/lib/utils";
 export function Header() {
   const pathname = usePathname();
   const { count } = useCart();
-  const { openEnquiry } = useEnquiry();
   const { authenticated, customer, loading, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerHasOpened = useRef(false);
 
   useEffect(() => {
     setMobileOpen(false);
     setCategoriesOpen(false);
     setAccountOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen && !categoriesOpen && !accountOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setMobileOpen(false);
+      setCategoriesOpen(false);
+      setAccountOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen, categoriesOpen, accountOpen]);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      drawerHasOpened.current = true;
+      drawerRef.current?.focus();
+    } else if (drawerHasOpened.current) {
+      menuButtonRef.current?.focus();
+    }
+  }, [mobileOpen]);
 
   useEffect(() => {
     function onScroll() {
@@ -89,7 +111,7 @@ export function Header() {
               label="Cart"
               icon={<CartIcon />}
               badge={count}
-              className="hidden sm:flex"
+              className="hidden lg:flex"
             />
             {WHATSAPP_NUMBER ? <button
               type="button"
@@ -100,7 +122,7 @@ export function Header() {
               <WhatsAppIcon />
               <span className="text-xs font-semibold">WhatsApp</span>
             </button> : null}
-            {authenticated ? <div className="relative hidden lg:block" onMouseEnter={() => setAccountOpen(true)} onMouseLeave={() => setAccountOpen(false)}><button type="button" onClick={() => setAccountOpen((open) => !open)} className="btn-signal btn-sm min-w-28" aria-expanded={accountOpen}><UserIcon /><span className="max-w-28 truncate">{accountLabel}</span></button>{accountOpen ? <div className="absolute right-0 top-full z-50 w-52 rounded-b-md border border-navy-100 bg-white p-2 shadow-lift"><AccountMenuLink href="/account">Dashboard</AccountMenuLink><AccountMenuLink href="/account/orders">Orders</AccountMenuLink><AccountMenuLink href="/account/enquiries">Enquiries</AccountMenuLink><AccountMenuLink href="/account/saved-products">Saved Products</AccountMenuLink><AccountMenuLink href="/account/profile">Profile</AccountMenuLink><button type="button" onClick={() => void logout()} className="block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-signal-700 hover:bg-navy-50">Sign out</button></div> : null}</div> : <Link href="/login" className="btn-signal btn-sm hidden min-w-28 lg:inline-flex"><UserIcon /><span>Login / Account</span></Link>}
+            {authenticated ? <div className="relative hidden lg:block" onMouseEnter={() => setAccountOpen(true)} onMouseLeave={() => setAccountOpen(false)}><button type="button" onClick={() => setAccountOpen((open) => !open)} className="btn-signal btn-sm min-w-28" aria-haspopup="true" aria-expanded={accountOpen}><UserIcon /><span className="max-w-28 truncate">{accountLabel}</span></button>{accountOpen ? <div className="absolute right-0 top-full z-50 w-52 rounded-b-md border border-navy-100 bg-white p-2 shadow-lift"><AccountMenuLink href="/account">Dashboard</AccountMenuLink><AccountMenuLink href="/account/orders">Orders</AccountMenuLink><AccountMenuLink href="/account/enquiries">Enquiries</AccountMenuLink><AccountMenuLink href="/account/saved-products">Saved Products</AccountMenuLink><AccountMenuLink href="/account/profile">Profile</AccountMenuLink><button type="button" onClick={() => void logout()} className="block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-signal-700 hover:bg-navy-50">Sign out</button></div> : null}</div> : <Link href="/login" className="btn-signal btn-sm hidden min-w-28 lg:inline-flex"><UserIcon /><span>Login / Account</span></Link>}
 
             <Link
               href={accountHref}
@@ -120,6 +142,7 @@ export function Header() {
             </Link>
 
             <button
+              ref={menuButtonRef}
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200 text-navy-900 lg:hidden"
@@ -154,6 +177,7 @@ export function Header() {
                         ? "border-brand-600 text-brand-700"
                         : "border-transparent text-navy-800 hover:border-navy-300 hover:text-brand-700",
                     )}
+                    aria-haspopup="true"
                     aria-expanded={categoriesOpen}
                   >
                     {item.label}
@@ -201,13 +225,6 @@ export function Header() {
                 </Link>
               ),
             )}
-            <button
-              type="button"
-              onClick={() => openEnquiry({ mode: "bulk", heading: "Sell / Enquire a Lot" })}
-              className="ml-auto py-2.5 text-[13px] font-semibold uppercase tracking-wide text-signal-600 hover:text-signal-700"
-            >
-              Sell / Enquire a Lot
-            </button>
           </div>
         </nav>
       </header>
@@ -221,17 +238,19 @@ export function Header() {
             onClick={() => setMobileOpen(false)}
           />
           <div
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label="Main navigation"
-            className="absolute right-0 top-0 h-full w-[88%] max-w-sm overflow-y-auto bg-white pb-24 shadow-lift"
+            tabIndex={-1}
+            className="absolute right-0 top-0 h-full w-[88%] max-w-sm overflow-y-auto bg-white pb-24 shadow-lift focus:outline-none"
           >
             <div className="flex items-center justify-between border-b border-navy-100 px-4 py-3">
               <Logo compact />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-navy-200"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200"
                 aria-label="Close menu"
               >
                 <CloseIcon />
@@ -259,16 +278,6 @@ export function Header() {
                   <WhatsAppIcon /> WhatsApp Us
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  openEnquiry({ mode: "bulk", heading: "Sell / Enquire a Lot" });
-                }}
-                className="btn-signal btn-sm mt-2 w-full"
-              >
-                Sell / Enquire a Lot
-              </button>
             </div>
 
             <nav className="border-t border-navy-100">

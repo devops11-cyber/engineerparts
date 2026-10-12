@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     template: "%s | Engineerparts.com",
   },
   description:
-    "Browse products available from Engineerparts.com through the live WooCommerce catalogue.",
+    "Browse industrial equipment, spare parts, tools and available clearance stock from Engineerparts.com.",
   metadataBase: new URL("https://engineerparts.com"),
   openGraph: {
     title: "Engineerparts.com | Industrial products",

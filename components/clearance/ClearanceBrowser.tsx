@@ -79,6 +79,15 @@ export function ClearanceBrowser({
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
+
   const activeCount = useMemo(() => {
     let count = 0;
     (
@@ -281,7 +290,7 @@ export function ClearanceBrowser({
       </aside>
 
       <div>
-        <div className="flex flex-col gap-3 rounded-card border border-navy-100 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:p-4">
+        <div className="card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
           <div className="relative flex-1">
             <input
               value={query}
@@ -352,7 +361,7 @@ export function ClearanceBrowser({
             {results.length === 1 ? "product" : "products"} found
           </p>
           <p className="text-xs text-steel-500">
-            Product availability is loaded from WooCommerce
+            Product availability
           </p>
         </div>
 
@@ -391,7 +400,7 @@ export function ClearanceBrowser({
           <div
             className={cn(
               "mt-6 grid gap-5",
-              layout === "grid" ? "sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1",
+              layout === "grid" ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1",
             )}
           >
             {results.map((product) => (
@@ -420,7 +429,7 @@ export function ClearanceBrowser({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-navy-200"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-navy-200"
                 aria-label="Close filters"
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -496,7 +505,10 @@ function CheckList({
         const value = values ? values[index] : option;
         const id = `${value}-${option}`.replace(/\s+/g, "-").toLowerCase();
         return (
-          <label key={value} className="flex cursor-pointer items-center gap-2.5 text-xs text-navy-800">
+          <label
+            key={value}
+            className="-mx-1 flex cursor-pointer items-center gap-2.5 rounded px-1 py-1.5 text-xs text-navy-800 hover:bg-navy-50"
+          >
             <input
               type="checkbox"
               id={id}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { brandsFromProducts } from "@/lib/data/brands";
-import { filterProducts, search, type SearchHit } from "@/lib/search";
+import { filterProducts, search, suggestProductQuery, type SearchHit } from "@/lib/search";
 import { getProducts } from "@/lib/woocommerce";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +20,18 @@ export async function GET(request: Request) {
   const brands = brandsFromProducts(allProducts);
   const staticHits = search(query, 24);
   const q = normalize(query);
+  const lots = staticHits.filter((hit) => hit.kind === "lot").slice(0, 3);
+  const equipment = staticHits.filter((hit) => hit.kind === "equipment").slice(0, 3);
+  const matchedBrands = brands.filter((brand) => normalize(brand.name).includes(q)).slice(0, 4);
+  const hasResults = products.length + lots.length + equipment.length + matchedBrands.length > 0;
+  const suggestion = hasResults ? undefined : suggestProductQuery(allProducts, query);
 
   return NextResponse.json({
     products: products.map((product): SearchHit => ({
       kind: "product",
       id: product.id,
       title: product.name,
-      subtitle: `${product.brand} - ${product.subcategory}`,
+      subtitle: [product.brand, product.subcategory].filter(Boolean).join(" - "),
       brand: product.brand,
       reference: product.part_number,
       condition: product.condition,
@@ -39,9 +44,10 @@ export async function GET(request: Request) {
       category: product.category,
       score: 200,
     })),
-    lots: staticHits.filter((hit) => hit.kind === "lot").slice(0, 3),
-    equipment: staticHits.filter((hit) => hit.kind === "equipment").slice(0, 3),
-    brands: brands.filter((brand) => normalize(brand.name).includes(q)).slice(0, 4),
+    ...(suggestion ? { suggestion } : {}),
+    lots,
+    equipment,
+    brands: matchedBrands,
     categories: [],
   });
 }

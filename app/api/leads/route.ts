@@ -11,6 +11,7 @@ interface EnquiryResponse {
   error?: string;
   lead_id?: string;
   received_at?: string;
+  admin_email_sent?: boolean;
 }
 
 function validLead(value: unknown): value is Partial<Lead> {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     method: "POST", body: payload, token: request.cookies.get(SESSION_COOKIE)?.value,
     clientIp: (request.headers.get("x-forwarded-for")?.split(",")[0] ?? request.ip ?? "unknown").trim(),
   });
-  return NextResponse.json(result.data.ok ? { ok: true, lead_id: result.data.lead_id, received_at: result.data.received_at } : { ok: false, error: result.data.error || "Unable to submit your enquiry." }, { status: result.status });
+  return NextResponse.json(result.data.ok ? { ok: true, lead_id: result.data.lead_id, received_at: result.data.received_at, admin_email_sent: result.data.admin_email_sent } : { ok: false, error: result.data.error || "Unable to submit your enquiry." }, { status: result.status });
 }
 
 export async function GET() {

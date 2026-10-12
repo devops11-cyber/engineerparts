@@ -30,7 +30,6 @@ const TYPES = [
   "Whole lot enquiry",
   "Equipment enquiry",
   "Bulk / large quantity",
-  "Sell or consign stock",
   "Other",
 ];
 
@@ -39,6 +38,7 @@ export function ContactForm() {
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [reference, setReference] = useState("");
+  const [adminEmailSent, setAdminEmailSent] = useState(true);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -60,17 +60,23 @@ export function ContactForm() {
         email: form.email,
         phone: form.phone,
         country: form.country,
+        enquiry_type: form.enquiryType,
         sku: form.reference || undefined,
-        message: [`Enquiry type: ${form.enquiryType}`, form.reference ? `Reference: ${form.reference}` : "", form.message]
+        message: [form.reference ? `Reference: ${form.reference}` : "", form.message]
           .filter(Boolean)
           .join("\n"),
         source: "contact_page",
       });
       setReference(lead.lead_id);
+      setAdminEmailSent(lead.admin_email_sent !== false);
       setState("done");
-    } catch {
+    } catch (cause) {
       setState("idle");
-      setError("Something went wrong. Please try again or use WhatsApp.");
+      setError(
+        cause instanceof Error && cause.message !== "Failed to fetch"
+          ? cause.message
+          : "Something went wrong. Please try again or use WhatsApp.",
+      );
     }
   }
 
@@ -82,10 +88,17 @@ export function ContactForm() {
           Your reference is <span className="font-mono font-semibold">{reference}</span>. The
           clearance desk will respond during the next working day.
         </p>
+        {!adminEmailSent ? (
+          <p role="alert" className="mt-3 text-sm font-semibold text-signal-700">
+            Your enquiry was saved, but the admin email could not be sent. Please contact the
+            clearance desk and quote your reference.
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={() => {
             setForm(EMPTY);
+            setAdminEmailSent(true);
             setState("idle");
           }}
           className="btn-navy btn-sm mt-5"

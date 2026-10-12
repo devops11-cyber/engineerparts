@@ -10,13 +10,13 @@ import { getProducts } from "@/lib/woocommerce";
 export const metadata: Metadata = {
   title: "Clearance Stock",
   description:
-    "Browse products from the live Engineerparts WooCommerce catalogue. Filter by brand, category, condition, price, quantity and location.",
+    "Browse industrial products and clearance stock. Filter by brand, category, condition, price, quantity and location.",
 };
 
 export default async function ClearancePage() {
   const products = await getProducts();
   const brands = brandsFromProducts(products);
-  const categoryCount = new Set(products.map((product) => product.category)).size;
+  const categoryCount = new Set(products.map((product) => product.category).filter((category) => category !== "uncategorised")).size;
   const facets = buildFacets(products);
 
   return (
@@ -26,13 +26,13 @@ export default async function ClearancePage() {
         breadcrumbs={[{ label: "Clearance Stock" }]}
         eyebrow="Clearance stock"
         title="Industrial product catalogue"
-        description="Listings, prices, availability and product details are loaded from WooCommerce."
+        description="Browse industrial products and clearance stock by brand, category, condition, price, quantity and location."
       >
-        <dl className="grid grid-cols-3 gap-3">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {[
-            [formatNumber(products.length), "Listings"],
-            [String(categoryCount), "Categories"],
-            [String(brands.length), "Brands"],
+            ...(products.length ? [[formatNumber(products.length), "Listings"]] : []),
+            ...(categoryCount ? [[String(categoryCount), "Categories"]] : []),
+            ...(brands.length ? [[String(brands.length), "Brands"]] : []),
           ].map(([value, label]) => (
             <div key={label} className="rounded-md border border-white/15 bg-white/5 px-4 py-3 text-center">
               <dt className="text-lg font-extrabold text-white">{value}</dt>

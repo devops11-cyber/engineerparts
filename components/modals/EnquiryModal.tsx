@@ -15,7 +15,6 @@ interface FormState {
   country: string;
   quantity: string;
   budget: string;
-  enquiryType: string;
   reference: string;
   message: string;
 }
@@ -28,19 +27,9 @@ const EMPTY: FormState = {
   country: "",
   quantity: "",
   budget: "",
-  enquiryType: "Product enquiry",
   reference: "",
   message: "",
 };
-
-const ENQUIRY_TYPES = [
-  "Product enquiry",
-  "Whole lot enquiry",
-  "Equipment enquiry",
-  "Bulk / large quantity",
-  "Sell or consign stock",
-  "Other",
-];
 
 export function EnquiryModal() {
   const { target, closeEnquiry } = useEnquiry();
@@ -58,7 +47,6 @@ export function EnquiryModal() {
   const leadType: LeadType = useMemo(() => {
     if (mode === "lot") return "whole_lot_enquiry";
     if (mode === "equipment") return "equipment_enquiry";
-    if (mode === "bulk") return "bulk_deal";
     return "product_enquiry";
   }, [mode]);
 
@@ -68,9 +56,7 @@ export function EnquiryModal() {
         ? "Whole lot enquiry"
         : mode === "equipment"
           ? "Enquire about this unit"
-          : mode === "bulk"
-            ? "Bulk enquiry"
-            : "Product enquiry");
+          : "Product enquiry");
 
   useEffect(() => {
     if (!target) return;
@@ -78,7 +64,6 @@ export function EnquiryModal() {
       ...EMPTY,
       quantity: product ? "1" : lot ? String(lot.total_quantity) : "1",
       reference: lot?.lot_reference ?? unit?.reference ?? product?.sku ?? "",
-      enquiryType: mode === "lot" ? "Whole lot enquiry" : "Product enquiry",
     });
     setSubmitted(null);
     setError(null);
@@ -119,7 +104,7 @@ export function EnquiryModal() {
 
   const quantityWanted = Number(form.quantity) || 0;
   const exceedsAvailable =
-    availableQuantity !== null && quantityWanted > availableQuantity && mode !== "bulk";
+    availableQuantity !== null && quantityWanted > availableQuantity;
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -161,7 +146,6 @@ export function EnquiryModal() {
         budget: form.budget || undefined,
         message: [
           form.message,
-          mode === "bulk" ? `Enquiry type: ${form.enquiryType}` : "",
           form.reference ? `Reference: ${form.reference}` : "",
         ]
           .filter(Boolean)
@@ -342,65 +326,29 @@ export function EnquiryModal() {
                 />
               </Field>
 
-              {mode === "bulk" ? (
-                <>
-                  <Field label="Enquiry type">
-                    <select
-                      className="field"
-                      value={form.enquiryType}
-                      onChange={(e) => update("enquiryType", e.target.value)}
-                    >
-                      {ENQUIRY_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Product / SKU / Lot reference">
-                    <input
-                      className="field"
-                      value={form.reference}
-                      onChange={(e) => update("reference", e.target.value)}
-                      placeholder="e.g. SKU or lot reference"
-                    />
-                  </Field>
-                  <Field label="Approx. quantity / budget">
-                    <input
-                      className="field"
-                      value={form.budget}
-                      onChange={(e) => update("budget", e.target.value)}
-                      placeholder="e.g. 50 units or a target budget"
-                    />
-                  </Field>
-                </>
-              ) : (
-                <>
-                  <Field
-                    label={mode === "lot" ? "Quantity required from lot" : "Quantity required"}
-                    hint={availableQuantity !== null ? `${formatNumber(availableQuantity)} available` : undefined}
-                  >
-                    <input
-                      type="number"
-                      min={1}
-                      max={availableQuantity ?? undefined}
-                      className="field"
-                      value={form.quantity}
-                      onChange={(e) => update("quantity", e.target.value)}
-                    />
-                  </Field>
-                  {mode === "product" || mode === "equipment" ? (
-                    <Field label="Budget / target price (optional)">
-                      <input
-                        className="field"
-                        value={form.budget}
-                        onChange={(e) => update("budget", e.target.value)}
-                        placeholder="Optional"
-                      />
-                    </Field>
-                  ) : null}
-                </>
-              )}
+              <Field
+                label={mode === "lot" ? "Quantity required from lot" : "Quantity required"}
+                hint={availableQuantity !== null ? `${formatNumber(availableQuantity)} available` : undefined}
+              >
+                <input
+                  type="number"
+                  min={1}
+                  max={availableQuantity ?? undefined}
+                  className="field"
+                  value={form.quantity}
+                  onChange={(e) => update("quantity", e.target.value)}
+                />
+              </Field>
+              {mode === "product" || mode === "equipment" ? (
+                <Field label="Budget / target price (optional)">
+                  <input
+                    className="field"
+                    value={form.budget}
+                    onChange={(e) => update("budget", e.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+              ) : null}
             </div>
 
             <div className="mt-4">

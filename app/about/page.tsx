@@ -4,7 +4,7 @@ import { PageHero } from "@/components/ui/PageHero";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "About the Engineerparts.com WooCommerce product catalogue.",
+  description: "Learn about Engineerparts.com and browse industrial products, spare parts, tools and clearance stock.",
 };
 
 export default function AboutPage() {
@@ -14,7 +14,7 @@ export default function AboutPage() {
         breadcrumbs={[{ label: "About" }]}
         eyebrow="About Engineerparts.com"
         title="About Engineerparts.com"
-        description="A product catalogue connected directly to WooCommerce."
+        description="Industrial equipment, spare parts and tools for business buyers."
       />
 
       <section className="section">
@@ -22,15 +22,13 @@ export default function AboutPage() {
           <div>
             <p className="eyebrow text-brand-600">Who we are</p>
             <h2 className="mt-2 text-2xl font-extrabold text-navy-900">
-              Product information in one place
+              Industrial products for business buyers
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-steel-700">
-              Engineerparts.com displays products from its connected WooCommerce catalogue. Product
-              details, prices, images and availability appear when they are supplied by WooCommerce.
+              Engineerparts.com helps businesses browse industrial equipment, spare parts, tools and engineering products, including available clearance stock.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-steel-700">
-              When information is not published, the listing identifies it as unavailable or provides
-              an enquiry option rather than inventing a value.
+              Review the information published with each listing, buy eligible items online, or contact our team when you need more details before making a decision.
             </p>
           </div>
         </div>
@@ -41,9 +39,9 @@ export default function AboutPage() {
           <h2 className="text-2xl font-extrabold text-navy-900">What you can do here</h2>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["Browse products", "View the products currently published in WooCommerce."],
+              ["Browse products", "Explore available industrial products and clearance stock."],
               ["Search", "Find listings by name, brand, model, SKU or part number."],
-              ["Review details", "See product data and images supplied by the catalogue."],
+              ["Review details", "Check the product information and specifications available on each listing."],
               ["Send enquiries", "Ask for information that is not available on a listing."],
             ].map(([title, copy]) => (
               <div key={title} className="card p-5">
@@ -60,8 +58,8 @@ export default function AboutPage() {
           <div>
             <h2 className="text-2xl font-extrabold text-navy-900">How listings work</h2>
             <ul className="mt-5 space-y-3 text-sm leading-relaxed text-steel-700">
-              <li>Published products are loaded from WooCommerce.</li>
-              <li>Stock quantity is shown only when WooCommerce provides it.</li>
+              <li>Product listings show available information, pricing and stock details.</li>
+              <li>Stock quantity is shown when it is available for a listing.</li>
               <li>Condition, location and lead time are shown only when supplied.</li>
               <li>Products without enough information remain available for enquiry.</li>
             </ul>

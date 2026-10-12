@@ -15,6 +15,7 @@ function validPayload(value: unknown): value is QuotePayload {
   return Boolean(
     /^[A-Z]{2}$/.test(payload.country ?? "") &&
       payload.items?.length &&
+      payload.items.length <= 50 &&
       payload.items.every(
         (item) =>
           Number.isInteger(Number(item.productId)) &&

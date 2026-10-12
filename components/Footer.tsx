@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { track } from "@/lib/analytics";
-import { WHATSAPP_NUMBER, whatsappLink } from "@/lib/utils";
+import { CONTACT_EMAIL, CONTACT_PHONE, WHATSAPP_NUMBER, whatsappLink } from "@/lib/utils";
 
 export function Footer() {
   function onWhatsApp() {
@@ -17,9 +17,11 @@ export function Footer() {
           <div>
             <Logo light />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-steel-400">
-              Industrial products loaded from the live Engineerparts WooCommerce catalogue.
+              Industrial equipment, spare parts, tools and clearance stock for business buyers.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
+              {CONTACT_EMAIL ? <a className="chip-dark" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> : null}
+              {CONTACT_PHONE ? <a className="chip-dark" href={`tel:${CONTACT_PHONE}`}>{CONTACT_PHONE}</a> : null}
               {WHATSAPP_NUMBER ? <a
                 href={whatsappLink("")}
                 target="_blank"
@@ -32,26 +34,28 @@ export function Footer() {
             </div>
           </div>
 
-          <FooterColumn
-            title="Clearance Stock"
-            links={[
-              { label: "All Clearance Stock", href: "/clearance" },
-              { label: "Recently Added", href: "/recently-added" },
-              { label: "Brands", href: "/brands" },
-            ]}
-          />
+          <div className="grid grid-cols-2 gap-6 sm:gap-10 lg:contents">
+            <FooterColumn
+              title="Clearance Stock"
+              links={[
+                { label: "All Clearance Stock", href: "/clearance" },
+                { label: "Recently Added", href: "/recently-added" },
+                { label: "Brands", href: "/brands" },
+              ]}
+            />
 
-          <FooterColumn
-            title="Company"
-            links={[
-              { label: "About", href: "/about" },
-              { label: "Contact", href: "/contact" },
-              { label: "My Enquiries", href: "/my-enquiries" },
-              { label: "Cart", href: "/cart" },
-              { label: "Privacy Policy", href: "/privacy-policy" },
-              { label: "Terms & Conditions", href: "/terms" },
-            ]}
-          />
+            <FooterColumn
+              title="Company"
+              links={[
+                { label: "About", href: "/about" },
+                { label: "Contact", href: "/contact" },
+                { label: "My Enquiries", href: "/my-enquiries" },
+                { label: "Cart", href: "/cart" },
+                { label: "Privacy Policy", href: "/privacy-policy" },
+                { label: "Terms & Conditions", href: "/terms" },
+              ]}
+            />
+          </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-4 border-t border-navy-800 pt-7 text-xs text-steel-500 sm:flex-row sm:items-center sm:justify-between">

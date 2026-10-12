@@ -160,6 +160,7 @@ export interface Lead {
   email: string;
   phone: string;
   country: string;
+  enquiry_type?: string;
   quantity?: number;
   budget?: string;
   message?: string;

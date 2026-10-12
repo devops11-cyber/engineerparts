@@ -1,4 +1,5 @@
 import type { Brand, Product } from "@/lib/types";
+import { isPublicProductValue } from "@/lib/utils";
 
 export const brands: Brand[] = [];
 export const FEATURED_BRANDS: Brand[] = [];
@@ -12,7 +13,7 @@ export function brandSlug(name: string): string {
 }
 
 export function brandsFromProducts(products: Product[]): Brand[] {
-  return Array.from(new Set(products.map((product) => product.brand).filter(Boolean)))
+  return Array.from(new Set(products.map((product) => product.brand).filter((brand) => isPublicProductValue(brand, "brand"))))
     .sort((left, right) => left.localeCompare(right))
     .map((name) => {
       const brandProducts = products.filter((product) => product.brand === name);

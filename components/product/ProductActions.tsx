@@ -9,6 +9,7 @@ import { SaveProductButton } from "@/components/account/SaveProductButton";
 import type { Product } from "@/lib/types";
 import {
   absoluteUrl,
+  cn,
   formatNumber,
   formatPrice,
   isPurchasable,
@@ -93,7 +94,7 @@ export function ProductActions({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-card border border-navy-100 bg-white p-5 shadow-card">
+    <div className="card p-5">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-navy-100 pb-4">
         <div>
           <p className="text-3xl font-extrabold tracking-tight text-navy-900">
@@ -128,7 +129,7 @@ export function ProductActions({ product }: { product: Product }) {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <QuantityStepper value={quantity} max={product.quantity_available} onChange={setQuantity} />
           <span className="text-xs text-steel-500">
-            Max {formatNumber(product.quantity_available)} per order
+            Up to {formatNumber(product.quantity_available)} units per order
           </span>
         </div>
       ) : null}
@@ -137,7 +138,7 @@ export function ProductActions({ product }: { product: Product }) {
         <SaveProductButton productId={product.id} className="sm:col-span-2" />
         {wooPurchasable ? (
           <button type="button" onClick={onWooCommerceCheckout} className="btn-primary sm:col-span-2">
-            Buy Now with WooCommerce
+            Buy Now
           </button>
         ) : null}
         {purchasable ? (
@@ -152,7 +153,14 @@ export function ProductActions({ product }: { product: Product }) {
         >
           Enquire About This Item
         </button>
-        <button type="button" onClick={onWhatsApp} className="btn border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100">
+        <button
+          type="button"
+          onClick={onWhatsApp}
+          className={cn(
+            "btn border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+            !purchasable && "sm:col-span-2",
+          )}
+        >
           WhatsApp
         </button>
         {product.listing_type === "Whole Lot" || (product.quantity_available ?? 0) >= 100 ? (
@@ -166,20 +174,20 @@ export function ProductActions({ product }: { product: Product }) {
         ) : null}
       </div>
 
-      <ul className="mt-5 space-y-2 border-t border-navy-100 pt-4 text-xs text-steel-600">
-        {product.warehouse_location !== "Not provided" ? (
+      {product.warehouse_location || product.lead_time ? <ul className="mt-5 space-y-2 border-t border-navy-100 pt-4 text-xs text-steel-600">
+        {product.warehouse_location ? (
           <li className="flex items-center justify-between gap-3">
             <span>Warehouse location</span>
             <span className="text-right font-semibold text-navy-800">{product.warehouse_location}</span>
           </li>
         ) : null}
-        {product.lead_time !== "Not provided" ? (
+        {product.lead_time ? (
           <li className="flex items-center justify-between gap-3">
             <span>Dispatch</span>
             <span className="text-right font-semibold text-navy-800">{product.lead_time}</span>
           </li>
         ) : null}
-      </ul>
+      </ul> : null}
     </div>
   );
 }

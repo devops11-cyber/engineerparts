@@ -12,7 +12,7 @@ import { ProductCard } from "@/components/cards/ProductCard";
 import { TrackView } from "@/components/TrackView";
 import { getLotByReference } from "@/lib/data/lots";
 import { brandSlug } from "@/lib/data/brands";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber, isPublicProductValue } from "@/lib/utils";
 import { getProduct, getProducts } from "@/lib/woocommerce";
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -53,7 +53,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
     ["Warehouse", product.warehouse_location],
     ["Dispatch", product.lead_time],
     ["Listed", product.added_date ? formatDate(product.added_date) : "Not provided"],
-  ].filter(([, value]) => value !== "Not provided");
+  ].filter(([, value]) => isPublicProductValue(value));
 
   return (
     <>
@@ -82,12 +82,12 @@ export default async function ProductPage({ params }: { params: { slug: string }
           <div className="min-w-0">
             <ListingBadges badges={product.badges} />
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Link
+              {product.brand ? <Link
                 href={`/brands/${brandSlug(product.brand)}`}
                 className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700 hover:text-brand-500"
               >
                 {product.brand}
-              </Link>
+              </Link> : null}
               <StatusPill status={product.status} />
               {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
             </div>
@@ -96,7 +96,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
               {product.name}
             </h1>
 
-            <dl className="mt-5 grid grid-cols-1 gap-x-4 gap-y-3 rounded-card border border-navy-100 bg-white p-4 text-xs shadow-card min-[380px]:grid-cols-2">
+            <dl className="card mt-5 grid grid-cols-1 gap-x-4 gap-y-3 p-4 text-xs sm:grid-cols-2">
               <Meta label="SKU" value={product.sku} />
               <Meta label="Manufacturer part number" value={product.part_number} />
               <Meta label="Model" value={product.model} />
@@ -137,12 +137,12 @@ export default async function ProductPage({ params }: { params: { slug: string }
               <p className="mt-3 text-sm leading-relaxed text-steel-700">{product.description}</p>
             </div>
 
-            {product.condition !== "Not provided" || product.condition_notes !== "Not provided" ? (
+            {product.condition !== "Not provided" || product.condition_notes ? (
               <div>
                 <h2 className="text-lg font-extrabold text-navy-900">Condition notes</h2>
-                <div className="mt-3 rounded-card border border-navy-100 bg-white p-4">
+                <div className="card mt-3 p-4">
                   {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
-                  {product.condition_notes !== "Not provided" ? (
+                  {product.condition_notes ? (
                     <p className="mt-3 text-sm leading-relaxed text-steel-700">{product.condition_notes}</p>
                   ) : null}
                 </div>
@@ -169,7 +169,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
           </div>
 
           <aside className="space-y-6">
-            <div className="rounded-card border border-navy-100 bg-white p-5 shadow-card">
+            <div className="card p-5">
               <h2 className="text-sm font-bold uppercase tracking-wide text-navy-900">
                 Stock information
               </h2>
@@ -182,16 +182,16 @@ export default async function ProductPage({ params }: { params: { slug: string }
                 ))}
               </dl>
               <p className="mt-4 border-t border-navy-100 pt-4 text-xs leading-relaxed text-steel-500">
-                Product details are loaded from WooCommerce. Send an enquiry if information is missing.
+                Need more product details? Send our team an enquiry.
               </p>
             </div>
 
-            <div className="rounded-card border border-navy-100 bg-white p-5 shadow-card">
+            <div className="card p-5">
               <h2 className="text-sm font-bold uppercase tracking-wide text-navy-900">
                 Product notes
               </h2>
               <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-steel-600">
-                <li>Images and product details are supplied by WooCommerce.</li>
+                <li>Product information is shown as provided for this listing.</li>
                 <li>Quantity is shown only when stock management provides an exact value.</li>
                 <li>Products without complete details can be submitted as enquiries.</li>
               </ul>

@@ -1,12 +1,13 @@
 import type { SpecItem } from "@/lib/types";
 
 export function SpecTable({ specs }: { specs: SpecItem[] }) {
-  if (!specs.length) return <p className="text-sm text-steel-500">No specifications recorded.</p>;
+  const visibleSpecs = specs.filter((spec) => spec.label.trim() && spec.value.trim() && !/^not provided$/i.test(spec.value.trim()));
+  if (!visibleSpecs.length) return <p className="text-sm text-steel-500">Technical specifications are not listed for this item. Contact us if you need more information.</p>;
   return (
     <div className="overflow-hidden rounded-card border border-navy-100">
       <table aria-label="Product specifications" className="w-full text-sm">
         <tbody className="divide-y divide-navy-100">
-          {specs.map((spec) => (
+          {visibleSpecs.map((spec) => (
             <tr key={`${spec.label}-${spec.value}`} className="grid even:bg-navy-50/50 sm:table-row">
               <th scope="row" className="px-4 pb-1 pt-3 text-left text-xs font-semibold uppercase tracking-wide text-steel-500 sm:w-1/3 sm:py-3">
                 {spec.label}

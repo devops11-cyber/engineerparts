@@ -17,8 +17,8 @@ function countByBrand(products: Awaited<ReturnType<typeof getProducts>>, name: s
 
 const WHY = [
   {
-    title: "Live product data",
-    copy: "Listings, prices and availability are loaded from WooCommerce.",
+    title: "Current availability",
+    copy: "Review listed quantities, prices and availability before you buy or enquire.",
     icon: (
       <path d="M3 9.5 12 4l9 5.5v9L12 21l-9-2.5v-9Z M3 9.5 12 15m0 0 9-5.5M12 15v6" />
     ),
@@ -43,12 +43,12 @@ const WHY = [
 export default async function HomePage() {
   const products = await getProducts();
   const brands = brandsFromProducts(products);
-  const categoryCount = new Set(products.map((product) => product.category)).size;
+  const categoryCount = new Set(products.map((product) => product.category).filter((category) => category && category !== "uncategorised")).size;
   const inventoryStats = [
-    [formatNumber(products.length), "Listings"],
-    [formatNumber(brands.length), "Brands"],
-    [formatNumber(categoryCount), "Categories"],
-  ];
+    ...(products.length ? [[formatNumber(products.length), "Listings"]] : []),
+    ...(brands.length ? [[formatNumber(brands.length), "Brands"]] : []),
+    ...(categoryCount ? [[formatNumber(categoryCount), "Categories"]] : []),
+  ] as [string, string][];
 
   return (
     <>
@@ -57,14 +57,14 @@ export default async function HomePage() {
           <div className="min-w-0 flex flex-col justify-center">
             <p className="eyebrow text-brand-600">Engineerparts.com &middot; Product catalogue</p>
             <h1 className="mt-4 text-[34px] font-extrabold leading-[1.05] tracking-tight text-navy-900 sm:text-5xl lg:text-[54px]">
-              Industrial products.
+              Industrial parts.
               <br />
-              Live catalogue.
+              Equipment and tools.
               <br />
-              <span className="text-brand-600">Ready to browse.</span>
+              <span className="text-brand-600">Ready to source.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-steel-600">
-              Browse products loaded directly from WooCommerce. Buy eligible items online or send an enquiry.
+              Find industrial equipment, spare parts and tools. Buy available clearance stock online or send our team an enquiry.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -78,23 +78,25 @@ export default async function HomePage() {
                 variant="hero"
                 placeholder="Search by brand, part number, model or product..."
               />
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-steel-400">
-                  Popular
-                </span>
-                {brands.slice(0, 6).map((brand) => (
-                  <Link key={brand.slug} href={`/search?q=${encodeURIComponent(brand.name)}`} className="chip">
-                    {brand.name}
-                  </Link>
-                ))}
-              </div>
+              {brands.length ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-steel-400">
+                    Popular
+                  </span>
+                  {brands.slice(0, 6).map((brand) => (
+                    <Link key={brand.slug} href={`/search?q=${encodeURIComponent(brand.name)}`} className="chip">
+                      {brand.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
           <div className="relative min-h-[320px] overflow-hidden rounded-card border border-navy-100 bg-navy-900 lg:min-h-[520px]">
             <Image
-              src={img(photo.warehouseAisle, 1400, 1600)}
-              alt="Industrial products"
+              src={img(photo.warehouseShelves, 1400, 1600)}
+              alt="Shelves of industrial stock in a warehouse"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"
@@ -111,7 +113,7 @@ export default async function HomePage() {
                 ))}
               </div>
               <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-brand-200">
-                Live product catalogue
+                Industrial stock, ready to browse
               </p>
             </div>
           </div>
@@ -121,9 +123,9 @@ export default async function HomePage() {
       <section className="section border-y border-navy-100 bg-navy-50/50">
         <div className="shell">
           <SectionHeading
-            eyebrow="Live catalogue"
-            title="Products from WooCommerce"
-            description="Product details, images, pricing and availability are shown when provided by WooCommerce."
+            eyebrow="Available stock"
+            title="Explore industrial products"
+            description="Browse industrial equipment, spare parts and tools available to buy or enquire about."
             action={{ label: "Browse all", href: "/clearance" }}
           />
           <div className="mt-8">
@@ -132,12 +134,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="section">
+      {brands.length ? <section className="section">
         <div className="shell">
           <SectionHeading
             eyebrow="Browse by brand"
             title="Products by manufacturer"
-            description="Brand pages are generated from the products currently available in WooCommerce."
+            description="Browse products from the manufacturers represented in our catalogue."
             action={{ label: "All brands", href: "/brands" }}
           />
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -146,7 +148,7 @@ export default async function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> : null}
 
       <section className="section border-y border-navy-100 bg-navy-50/50">
         <div className="shell">
@@ -181,7 +183,7 @@ export default async function HomePage() {
         <div className="shell">
           <ClearanceAlerts />
           <p className="mt-6 text-xs text-steel-500">
-            {formatNumber(products.length)} live product listings are currently loaded from WooCommerce.
+            {formatNumber(products.length)} product listings are currently available to browse.
           </p>
         </div>
       </section>

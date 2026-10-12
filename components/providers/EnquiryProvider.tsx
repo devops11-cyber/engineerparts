@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Equipment, Lot, Product } from "@/lib/types";
 
-export type EnquiryMode = "product" | "lot" | "equipment" | "bulk";
+export type EnquiryMode = "product" | "lot" | "equipment";
 
 export interface EnquiryTarget {
   mode: EnquiryMode;

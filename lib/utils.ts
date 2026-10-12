@@ -19,6 +19,31 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-AE").format(value);
 }
 
+export function isPublicProductValue(value: string, field?: "brand"): boolean {
+  const normalized = value.trim().toLowerCase();
+  return Boolean(
+    normalized &&
+      !["not provided", "n/a", "na", "unknown", "none", "uncategorised", "uncategorized"].includes(normalized) &&
+      !(field === "brand" && normalized === "bhatia"),
+  );
+}
+
+export function normalizePhone(value: string): string {
+  return value.trim().replace(/[()\s.-]/g, "");
+}
+
+export function isValidInternationalPhone(value: string): boolean {
+  return /^\+[1-9]\d{6,14}$/.test(normalizePhone(value));
+}
+
+export function isPlausibleAddress(value: string): boolean {
+  const address = value.trim();
+  return address.length >= 5 && /[a-z]/i.test(address) && !/[bcdfghjklmnpqrstvwxyz]{9,}/i.test(address);
+}
+
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() ?? "";
+export const CONTACT_PHONE = process.env.NEXT_PUBLIC_CONTACT_PHONE?.trim() ?? "";
+
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("en-AE", {
     day: "2-digit",

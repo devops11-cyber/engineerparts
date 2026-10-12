@@ -4,6 +4,7 @@ import { getCurrentCustomer } from "@/lib/auth-server";
 import { wordpressAccountRequest } from "@/lib/auth-server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/account";
+import { isPlausibleAddress, isValidInternationalPhone } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ interface OrderPayload {
   };
   items: Array<{ productId: string; quantity: number }>;
   saveAddress?: boolean;
+  acceptPolicies: true;
 }
 
 interface CustomerAddress {
@@ -36,24 +38,51 @@ function validPayload(value: unknown): value is OrderPayload {
   const customer = payload.customer;
   const billing = customer?.billing;
   return Boolean(
-    payload.order_id &&
-      billing?.firstName?.trim() &&
-      billing.lastName?.trim() &&
-      billing.email?.trim() &&
-      billing.phone?.trim() &&
-      billing.address1?.trim() &&
-      billing.city?.trim() &&
-      /^[A-Z]{2}$/.test(billing.country) &&
-      payload.items?.length &&
+    typeof payload.order_id === "string" &&
+      payload.order_id.trim() &&
+      billing &&
+      validAddress(billing) &&
+      typeof billing.email === "string" &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billing.email.trim()) &&
+      typeof billing.phone === "string" &&
+      isValidInternationalPhone(billing.phone) &&
+      payload.acceptPolicies === true &&
+      Array.isArray(payload.items) &&
+      payload.items.length > 0 &&
+      payload.items.length <= 50 &&
       payload.items.every(
-        (item) => Number.isInteger(Number(item.productId)) && Number(item.productId) > 0 && Number.isInteger(item.quantity) && item.quantity > 0,
+        (item) => Boolean(
+          item &&
+            typeof item === "object" &&
+            Number.isInteger(Number(item.productId)) &&
+            Number(item.productId) > 0 &&
+            Number.isInteger(item.quantity) &&
+            item.quantity > 0,
+        ),
       ) &&
-      (!customer?.shipping || validAddress(customer.shipping)),
+      (customer?.shipping === undefined || validAddress(customer.shipping)),
   );
 }
 
-function validAddress(address: CustomerAddress): boolean {
-  return Boolean(address.firstName?.trim() && address.lastName?.trim() && address.address1?.trim() && address.city?.trim() && /^[A-Z]{2}$/.test(address.country));
+function validAddress(value: unknown): value is CustomerAddress {
+  if (!value || typeof value !== "object") return false;
+  const address = value as Partial<CustomerAddress>;
+  return Boolean(
+    typeof address.firstName === "string" &&
+      address.firstName.trim().length >= 2 &&
+      typeof address.lastName === "string" &&
+      address.lastName.trim().length >= 2 &&
+      typeof address.company === "string" &&
+      typeof address.address1 === "string" &&
+      isPlausibleAddress(address.address1) &&
+      typeof address.address2 === "string" &&
+      typeof address.city === "string" &&
+      address.city.trim().length >= 2 &&
+      typeof address.state === "string" &&
+      typeof address.postalCode === "string" &&
+      typeof address.country === "string" &&
+      /^[A-Z]{2}$/.test(address.country),
+  );
 }
 
 function wooAddress(address: CustomerAddress) {
@@ -86,7 +115,10 @@ export async function POST(request: NextRequest) {
     const billingAddress = wooAddress(payload.customer.billing);
     const shippingAddress = wooAddress(payload.customer.shipping ?? payload.customer.billing);
     const customer = await getCurrentCustomer();
-    const quote = await getWooCommerceCartQuote(payload.items, payload.customer.billing.country);
+    const quote = await getWooCommerceCartQuote(
+      payload.items,
+      payload.customer.shipping?.country ?? payload.customer.billing.country,
+    );
     const unavailable = payload.items
       .map((item) => {
         const stock = quote.stockLimits.find(({ productId }) => productId === item.productId);
@@ -101,6 +133,7 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
+    const policyAcceptedAt = new Date().toISOString();
     const order = await createWooCommerceOrder({
       customer_id: customer?.id,
       payment_method: "nomod",
@@ -126,9 +159,29 @@ export async function POST(request: NextRequest) {
       customer_note: "",
       meta_data: [
         { key: "storefront_reference", value: payload.order_id },
+        { key: "storefront_terms_accepted", value: policyAcceptedAt },
+        { key: "storefront_privacy_acknowledged", value: policyAcceptedAt },
       ],
     });
-    if (!order.payment_url) throw new Error("WooCommerce did not return a payment URL");
+    if (!order.payment_url) {
+      console.error(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        endpoint: "/api/orders",
+        category: "woocommerce_order_missing_payment_url",
+        order_id: order.id,
+        order_number: order.number,
+      }));
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "payment_handoff_failed",
+          error: `Your order (${order.number}) was created, but secure payment could not be started. Please contact support before placing another order.`,
+        },
+        { status: 502 },
+      );
+    }
+
+    const paymentUrl = order.payment_url;
 
     if (customer && payload.saveAddress) {
       const token = cookies().get(SESSION_COOKIE)?.value;
@@ -149,12 +202,17 @@ export async function POST(request: NextRequest) {
       ok: true,
       order_id: order.id,
       order_number: order.number,
-      payment_url: order.payment_url,
+      payment_url: paymentUrl,
     });
   } catch (error) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), endpoint: "/api/orders", category: "woocommerce_order_failed" }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      endpoint: "/api/orders",
+      category: "woocommerce_order_failed",
+      error: error instanceof Error ? { name: error.name, message: error.message } : String(error),
+    }));
     return NextResponse.json(
-      { ok: false, error: "Unable to place the order right now. Please try again." },
+      { ok: false, error: "We could not submit your order. Please try again or contact our sales team." },
       { status: 502 },
     );
   }

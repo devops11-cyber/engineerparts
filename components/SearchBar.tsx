@@ -127,7 +127,7 @@ export function SearchBar({
           runSearch(query);
         }}
         className={[
-          "flex w-full items-stretch overflow-hidden rounded-md border bg-white",
+          "flex w-full items-stretch overflow-hidden rounded-md border bg-white focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/25",
           hero ? "border-transparent shadow-lift" : "border-navy-200",
         ].join(" ")}
       >
@@ -153,7 +153,7 @@ export function SearchBar({
           aria-expanded={open && Boolean(groups)}
           aria-controls="search-suggestions"
           className={[
-            "min-w-0 flex-1 bg-transparent px-3 text-navy-900 placeholder:text-steel-400 focus:outline-none",
+            "min-w-0 flex-1 bg-transparent px-3 text-navy-900 caret-navy-900 placeholder:text-steel-400 focus:outline-none focus-visible:ring-0",
             hero ? "py-4 text-base" : "py-3 text-sm",
           ].join(" ")}
         />
@@ -177,6 +177,7 @@ export function SearchBar({
           {flat.length === 0 ? (
             <div className="px-5 py-6 text-sm text-steel-600">
               <p className="font-semibold text-navy-900">No matching clearance stock</p>
+              {groups.suggestion ? <p className="mt-1">Did you mean <Link className="font-semibold text-brand-700 underline" href={`/search?q=${encodeURIComponent(groups.suggestion)}`} onClick={() => setOpen(false)}>{groups.suggestion}</Link>?</p> : null}
               <p className="mt-1">
                 Try a different part number, or{" "}
                 <Link href="/contact" className="text-brand-600 underline" onClick={() => setOpen(false)}>
@@ -187,6 +188,7 @@ export function SearchBar({
             </div>
           ) : (
             <div className="divide-y divide-navy-50">
+              {groups.suggestion ? <p className="px-4 py-2 text-xs text-steel-600">Did you mean <Link className="font-semibold text-brand-700 underline" href={`/search?q=${encodeURIComponent(groups.suggestion)}`} onClick={() => setOpen(false)}>{groups.suggestion}</Link>?</p> : null}
               {groups.products.length ? (
                 <Group title="Clearance stock">
                   {groups.products.map((hit, index) => (

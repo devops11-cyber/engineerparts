@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { ProductCard } from "@/components/cards/ProductCard";
 import { LotCard } from "@/components/cards/LotCard";
 import { EquipmentCard } from "@/components/cards/EquipmentCard";
 import { SearchBar } from "@/components/SearchBar";
-import { filterProducts, search } from "@/lib/search";
+import { filterProducts, search, suggestProductQuery } from "@/lib/search";
 import { lots } from "@/lib/data/lots";
 import { equipment } from "@/lib/data/equipment";
 import { track } from "@/lib/analytics";
@@ -26,6 +27,11 @@ export function SearchResults({ initialQuery, products }: { initialQuery: string
     () => (query.trim() ? filterProducts(products, { q: query }).slice(0, 60) : []),
     [products, query],
   );
+  const resultCount = productItems.length + hits.length;
+  const suggestion = useMemo(
+    () => (resultCount === 0 ? suggestProductQuery(products, query) : undefined),
+    [products, query, resultCount],
+  );
   const lotItems = lotHits
     .map((hit) => lots.find((l) => l.id === hit.id))
     .filter((l): l is NonNullable<typeof l> => Boolean(l));
@@ -41,8 +47,6 @@ export function SearchResults({ initialQuery, products }: { initialQuery: string
     else track("search", { query: term, source: "search_page", results: resultCount });
   }, [query, hits.length, productItems.length]);
 
-  const resultCount = productItems.length + hits.length;
-
   return (
     <div>
       <SearchBar variant="hero" initialQuery={query} />
@@ -56,6 +60,15 @@ export function SearchResults({ initialQuery, products }: { initialQuery: string
             Try a different part number, or send an enquiry and we will look through warehouse stock
             that is not yet listed.
           </p>
+          {suggestion ? (
+            <p className="mt-3 text-sm text-steel-600">
+              Did you mean{" "}
+              <Link className="font-semibold text-brand-700 underline" href={`/search?q=${encodeURIComponent(suggestion)}`}>
+                {suggestion}
+              </Link>
+              ?
+            </p>
+          ) : null}
           <a href="/contact" className="btn-navy btn-sm mt-5 inline-flex">
             Send an enquiry
           </a>

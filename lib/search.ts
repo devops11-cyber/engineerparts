@@ -33,6 +33,79 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9./-]+/g, " ").trim();
 }
 
+function productSearchText(product: Product): string {
+  return [
+    product.sku,
+    product.name,
+    product.brand,
+    product.manufacturer,
+    product.part_number,
+    product.model,
+    product.description,
+    product.category,
+    product.subcategory,
+    product.specifications.map((spec) => `${spec.label} ${spec.value}`).join(" "),
+  ].join(" ");
+}
+
+function editDistance(left: string, right: string): number {
+  const distances = Array.from({ length: left.length + 1 }, () => Array<number>(right.length + 1).fill(0));
+  for (let i = 0; i <= left.length; i += 1) distances[i][0] = i;
+  for (let j = 0; j <= right.length; j += 1) distances[0][j] = j;
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      distances[i][j] = Math.min(
+        distances[i - 1][j] + 1,
+        distances[i][j - 1] + 1,
+        distances[i - 1][j - 1] + cost,
+      );
+      if (i > 1 && j > 1 && left[i - 1] === right[j - 2] && left[i - 2] === right[j - 1]) {
+        distances[i][j] = Math.min(distances[i][j], distances[i - 2][j - 2] + cost);
+      }
+    }
+  }
+  return distances[left.length][right.length];
+}
+
+function typoLimit(word: string): number {
+  return word.length >= 6 ? 2 : word.length >= 4 ? 1 : 0;
+}
+
+function closestProductToken(products: Product[], word: string): string | undefined {
+  const candidates = Array.from(new Set(products.flatMap((product) => normalize(productSearchText(product)).split(/\s+/))));
+  let closest: string | undefined;
+  let closestDistance = typoLimit(word) + 1;
+  for (const candidate of candidates) {
+    const limit = typoLimit(word);
+    if (!candidate || candidate === word || Math.abs(candidate.length - word.length) > limit) continue;
+    const distance = editDistance(word, candidate);
+    if (distance <= limit && distance < closestDistance) {
+      closest = candidate;
+      closestDistance = distance;
+    }
+  }
+  return closest;
+}
+
+export function suggestProductQuery(products: Product[], query: string): string | undefined {
+  const normalizedQuery = normalize(query);
+  if (!normalizedQuery) return undefined;
+
+  const exactMatch = products.some((product) => normalize(productSearchText(product)).includes(normalizedQuery));
+  if (exactMatch) return undefined;
+
+  const words = normalizedQuery.split(/\s+/);
+  const suggestions = words.map((word) => {
+    const exactWord = products.some((product) => normalize(productSearchText(product)).split(/\s+/).includes(word));
+    return exactWord ? word : closestProductToken(products, word);
+  });
+  return suggestions.every(Boolean) && suggestions.some((word, index) => word !== words[index])
+    ? suggestions.join(" ")
+    : undefined;
+}
+
 const index: IndexEntry[] = [];
 
 lots.forEach((l) => {
@@ -151,6 +224,7 @@ export interface SuggestionGroups {
   equipment: SearchHit[];
   brands: Brand[];
   categories: Category[];
+  suggestion?: string;
 }
 
 export interface ClearanceQuery {
@@ -171,26 +245,8 @@ export interface ClearanceQuery {
 }
 
 export function filterProducts(list: Product[], query: ClearanceQuery): Product[] {
-  const q = query.q?.trim().toLowerCase() ?? "";
-
-  let result = list.filter((p) => {
-    if (q) {
-      const haystack = [
-        p.sku,
-        p.name,
-        p.brand,
-        p.manufacturer,
-        p.part_number,
-        p.model,
-        p.description,
-        p.category,
-        p.subcategory,
-        p.specifications.map((s) => `${s.label} ${s.value}`).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
+  const q = normalize(query.q ?? "");
+  const applyFilters = (products: Product[]) => products.filter((p) => {
     if (query.brands?.length && !query.brands.includes(p.brand)) return false;
     if (query.manufacturers?.length && !query.manufacturers.includes(p.manufacturer)) return false;
     if (query.categories?.length && !query.categories.includes(p.category)) return false;
@@ -199,8 +255,9 @@ export function filterProducts(list: Product[], query: ClearanceQuery): Product[
     if (query.locations?.length && !query.locations.includes(p.warehouse_location)) return false;
     if (query.productTypes?.length && !query.productTypes.includes(p.listing_type)) return false;
     if (query.availability?.length && !query.availability.includes(p.status)) return false;
-    if (query.minPrice !== undefined && (p.price ?? Infinity) < query.minPrice) return false;
-    if (query.maxPrice !== undefined && (p.price ?? 0) > query.maxPrice) return false;
+    if ((query.minPrice !== undefined || query.maxPrice !== undefined) && p.price === null) return false;
+    if (query.minPrice !== undefined && p.price! < query.minPrice) return false;
+    if (query.maxPrice !== undefined && p.price! > query.maxPrice) return false;
     if (query.minQuantity !== undefined && (p.quantity_available === null || p.quantity_available < query.minQuantity)) return false;
     if (query.spec?.trim()) {
       const spec = query.spec.trim().toLowerCase();
@@ -209,6 +266,17 @@ export function filterProducts(list: Product[], query: ClearanceQuery): Product[
     }
     return true;
   });
+  let result = applyFilters(list.filter((product) => !q || normalize(productSearchText(product)).includes(q)));
+  if (!result.length && q) {
+    const words = q.split(/\s+/);
+    result = applyFilters(list.filter((product) => {
+      const tokens = normalize(productSearchText(product)).split(/\s+/);
+      return words.every((word) => tokens.some((token) =>
+        token === word ||
+        (Math.abs(word.length - token.length) <= typoLimit(word) && editDistance(word, token) <= typoLimit(word)),
+      ));
+    }));
+  }
 
   switch (query.sort) {
     case "price-asc":
@@ -226,10 +294,14 @@ export function filterProducts(list: Product[], query: ClearanceQuery): Product[
     case "brand":
       result = result.sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name));
       break;
-    default:
-      result = result.sort(
-        (a, b) => new Date(b.added_date).getTime() - new Date(a.added_date).getTime(),
-      );
+    default: {
+      const time = (value: string) => {
+        const parsed = new Date(value).getTime();
+        return Number.isNaN(parsed) ? -Infinity : parsed;
+      };
+      result = result.sort((a, b) => time(b.added_date) - time(a.added_date));
+      break;
+    }
   }
 
   return result;

@@ -10,6 +10,7 @@ import type {
   ListingType,
   Product,
 } from "@/lib/types";
+import { isPublicProductValue } from "@/lib/utils";
 
 type WooProduct = {
   id: number;
@@ -84,6 +85,8 @@ export interface WooOrder {
   total: string;
   currency: string;
   payment_url: string;
+  order_key: string;
+  status: string;
   line_items: Array<{
     product_id: number;
     name: string;
@@ -138,6 +141,19 @@ function checkoutUrl(productId: number): string | undefined {
 
 function mapProduct(product: WooProduct): Product {
   const conditionValue = text(metadata(product, "condition"), attribute(product, "Condition"));
+  const manufacturer = [metadata(product, "manufacturer"), attribute(product, "Manufacturer")]
+    .map((value) => text(value))
+    .find((value) => isPublicProductValue(value)) ?? "";
+  const brand = [metadata(product, "brand"), attribute(product, "Brand"), manufacturer]
+    .map((value) => text(value))
+    .find((value) => isPublicProductValue(value, "brand")) ?? "";
+  const warehouse = text(metadata(product, "warehouse_location"));
+  const conditionNotes = text(metadata(product, "condition_notes"));
+  const model = text(metadata(product, "model"), attribute(product, "Model"));
+  const partNumber = [metadata(product, "part_number")]
+    .map((value) => text(value))
+    .find((value) => isPublicProductValue(value)) ?? (attribute(product, "Part Number") || product.sku);
+  const leadTime = text(metadata(product, "lead_time"));
   const listingValue = text(metadata(product, "listing_type"));
   const badgeValue = metadata(product, "badges");
   const productBadges = (Array.isArray(badgeValue) ? badgeValue : text(badgeValue).split(","))
@@ -149,30 +165,29 @@ function mapProduct(product: WooProduct): Product {
     sku: product.sku,
     name: product.name,
     slug: product.slug,
-    brand: text(metadata(product, "brand"), attribute(product, "Brand") || "Not provided"),
-    manufacturer: text(metadata(product, "manufacturer"), attribute(product, "Manufacturer") || "Not provided"),
-    part_number: text(metadata(product, "part_number"), attribute(product, "Part Number") || product.sku),
-    model: text(metadata(product, "model"), attribute(product, "Model") || "Not provided"),
+    brand,
+    manufacturer: isPublicProductValue(manufacturer) ? manufacturer : "",
+    part_number: partNumber,
+    model: isPublicProductValue(model) ? model : "",
     category: category(product),
     subcategory: product.categories[0]?.name ?? "Uncategorised",
     description: stripHtml(product.description || product.short_description),
     condition: conditions.includes(conditionValue as ConditionGrade) ? (conditionValue as ConditionGrade) : "Not provided",
-    condition_notes: text(metadata(product, "condition_notes"), "Not provided"),
+    condition_notes: isPublicProductValue(conditionNotes) ? conditionNotes : "",
     quantity_available: product.stock_quantity,
     price: product.price ? Number(product.price) : null,
     currency: product.currency_code ?? "",
     listing_type: listingTypes.includes(listingValue as ListingType)
       ? (listingValue as ListingType)
       : "Buy or Enquire",
-    warehouse_location: text(metadata(product, "warehouse_location"), "Not provided"),
+    warehouse_location: isPublicProductValue(warehouse) ? warehouse : "",
     lot_id: text(metadata(product, "lot_id")) || null,
     images: product.images.length
       ? product.images.map((image) => image.src)
       : [`${process.env.WOOCOMMERCE_URL?.replace(/\/$/, "")}/wp-content/plugins/woocommerce/assets/images/placeholder.png`],
-    specifications: product.attributes.map((item) => ({
-      label: item.name,
-      value: item.options.join(", "),
-    })),
+    specifications: product.attributes
+      .map((item) => ({ label: item.name.trim(), value: item.options.join(", ").trim() }))
+      .filter((item) => isPublicProductValue(item.label) && isPublicProductValue(item.value)),
     documents: [],
     status:
       product.stock_status === "outofstock"
@@ -180,7 +195,7 @@ function mapProduct(product: WooProduct): Product {
         : "Available",
     badges: productBadges,
     added_date: product.date_created.slice(0, 10),
-    lead_time: text(metadata(product, "lead_time"), "Not provided"),
+    lead_time: isPublicProductValue(leadTime) ? leadTime : "",
     woocommerce_checkout_url: checkoutUrl(product.id),
   };
 }
@@ -219,18 +234,24 @@ function signHttpUrl(url: URL, key: string, secret: string): void {
   url.searchParams.set("oauth_signature", signature);
 }
 
+function authorizeRequest(url: URL, config: NonNullable<ReturnType<typeof configuration>>): HeadersInit {
+  if (url.protocol === "https:") {
+    return {
+      Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    };
+  }
+  signHttpUrl(url, config.key, config.secret);
+  return { "Content-Type": "application/json" };
+}
+
 async function fetchPage(page: number, config: NonNullable<ReturnType<typeof configuration>>) {
   const url = new URL(`${config.url}/wp-json/wc/v3/products`);
   url.searchParams.set("status", "publish");
   url.searchParams.set("per_page", "100");
   url.searchParams.set("page", String(page));
 
-  const headers: HeadersInit = {};
-  if (url.protocol === "https:") {
-    headers.Authorization = `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`;
-  } else {
-    signHttpUrl(url, config.key, config.secret);
-  }
+  const headers = authorizeRequest(url, config);
 
   const response = await fetch(url, { headers, next: { revalidate: 300 } });
 
@@ -339,13 +360,6 @@ export async function getProduct(slug: string): Promise<Product | undefined> {
   return (await getProducts()).find((product) => product.slug === slug);
 }
 
-function authorization(config: NonNullable<ReturnType<typeof configuration>>): HeadersInit {
-  return {
-    Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`,
-    "Content-Type": "application/json",
-  };
-}
-
 export interface WooCountry {
   code: string;
   name: string;
@@ -356,8 +370,9 @@ export async function getWooCommerceCountries(): Promise<WooCountry[]> {
   if (!config) return [{ code: "AE", name: "United Arab Emirates" }];
 
   try {
-    const response = await fetch(`${config.url}/wp-json/wc/v3/data/countries`, {
-      headers: authorization(config),
+    const url = new URL(`${config.url}/wp-json/wc/v3/data/countries`);
+    const response = await fetch(url, {
+      headers: authorizeRequest(url, config),
       next: { revalidate: 86400 },
     });
     if (!response.ok) throw new Error(`Countries request failed (${response.status})`);
@@ -412,24 +427,48 @@ interface WooShippingMethod {
 
 async function getConfiguredShippingMethods(
   config: NonNullable<ReturnType<typeof configuration>>,
+  country: string,
 ): Promise<{
   freeShipping?: { title: string; minimum: number };
   flatRate?: { methodId: string; title: string; cost: number };
 }> {
   try {
-    const zonesResponse = await fetch(`${config.url}/wp-json/wc/v3/shipping/zones`, {
-      headers: authorization(config),
+    const zonesUrl = new URL(`${config.url}/wp-json/wc/v3/shipping/zones`);
+    const zonesResponse = await fetch(zonesUrl, {
+      headers: authorizeRequest(zonesUrl, config),
       next: { revalidate: 300 },
     });
     if (!zonesResponse.ok) return {};
     const zones = (await zonesResponse.json()) as Array<{ id: number }>;
+    const zonesWithLocations = await Promise.all(
+      zones.map(async (zone) => {
+        const locationsUrl = new URL(`${config.url}/wp-json/wc/v3/shipping/zones/${zone.id}/locations`);
+        const response = await fetch(locationsUrl, {
+          headers: authorizeRequest(locationsUrl, config),
+          next: { revalidate: 300 },
+        });
+        const locations = response.ok
+          ? ((await response.json()) as Array<{ type: string; code: string }>)
+          : [];
+        return { zone, locations };
+      }),
+    );
+    const matchedZone = zonesWithLocations.find(({ locations }) =>
+      locations.some((location) => location.type === "country" && location.code === country),
+    );
+    const restOfWorldZone = zonesWithLocations.find(({ locations }) => locations.length === 0);
+    const targetZoneIds = (matchedZone ?? restOfWorldZone)
+      ? [(matchedZone ?? restOfWorldZone)!.zone.id]
+      : zones.map((zone) => zone.id);
+
     const methods = (
       await Promise.all(
-        zones.map(async (zone) => {
-          const response = await fetch(
-            `${config.url}/wp-json/wc/v3/shipping/zones/${zone.id}/methods`,
-            { headers: authorization(config), next: { revalidate: 300 } },
-          );
+        targetZoneIds.map(async (zoneId) => {
+          const methodsUrl = new URL(`${config.url}/wp-json/wc/v3/shipping/zones/${zoneId}/methods`);
+          const response = await fetch(methodsUrl, {
+            headers: authorizeRequest(methodsUrl, config),
+            next: { revalidate: 300 },
+          });
           return response.ok ? ((await response.json()) as WooShippingMethod[]) : [];
         }),
       )
@@ -471,10 +510,13 @@ export async function getWooCommerceCartQuote(
   const config = configuration();
   if (!config) throw new Error("WooCommerce is not configured");
 
-  const stockResponse = await fetch(
-    `${config.url}/wp-json/wc/v3/products?include=${items.map(({ productId }) => encodeURIComponent(productId)).join(",")}&per_page=100`,
-    { headers: authorization(config), cache: "no-store" },
-  );
+  const stockUrl = new URL(`${config.url}/wp-json/wc/v3/products`);
+  stockUrl.searchParams.set("include", items.map(({ productId }) => productId).join(","));
+  stockUrl.searchParams.set("per_page", "100");
+  const stockResponse = await fetch(stockUrl, {
+    headers: authorizeRequest(stockUrl, config),
+    cache: "no-store",
+  });
   if (!stockResponse.ok) {
     throw new Error(`WooCommerce stock request failed (${stockResponse.status})`);
   }
@@ -534,7 +576,7 @@ export async function getWooCommerceCartQuote(
   const shippingRate = cart.shipping_rates
     .flatMap((shipment) => shipment.shipping_rates)
     .find((rate) => rate.selected) ?? cart.shipping_rates.flatMap((shipment) => shipment.shipping_rates)[0];
-  const configured = shippingRate ? {} : await getConfiguredShippingMethods(config);
+  const configured = shippingRate ? {} : await getConfiguredShippingMethods(config, country);
   const fallbackShipping = configured.flatRate;
   const shipping = shippingRate
     ? Number(cart.totals.total_shipping ?? 0) / divisor
@@ -578,7 +620,10 @@ export async function createWooCommerceOrder(order: WooOrderInput): Promise<WooO
 
   const response = await fetch(`${config.url}/wp-json/wc/v3/orders`, {
     method: "POST",
-    headers: authorization(config),
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.key}:${config.secret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(order),
     cache: "no-store",
   });
@@ -589,4 +634,36 @@ export async function createWooCommerceOrder(order: WooOrderInput): Promise<WooO
   }
 
   return (await response.json()) as WooOrder;
+}
+
+export async function getWooCommerceOrder(orderId: number): Promise<WooOrder> {
+  const config = configuration();
+  if (!config) throw new Error("WooCommerce is not configured");
+
+  const orderUrl = new URL(`${config.url}/wp-json/wc/v3/orders/${orderId}`);
+  const response = await fetch(orderUrl, {
+    headers: authorizeRequest(orderUrl, config),
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    throw new OrderNotFoundError();
+  }
+  if (!response.ok) {
+    throw new Error(`WooCommerce order request failed (${response.status})`);
+  }
+
+  return (await response.json()) as WooOrder;
+}
+
+class OrderNotFoundError extends Error {}
+
+export async function getWooCommerceOrderIfKeyMatches(orderId: number, orderKey: string): Promise<WooOrder | null> {
+  try {
+    const order = await getWooCommerceOrder(orderId);
+    return order.order_key === orderKey ? order : null;
+  } catch (error) {
+    if (error instanceof OrderNotFoundError) return null;
+    throw error;
+  }
 }

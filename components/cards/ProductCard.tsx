@@ -96,9 +96,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
 
       <div className={cn("flex min-w-0 flex-1 flex-col p-4", list ? "sm:p-5" : "")}>
         <div className="flex items-start justify-between gap-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-700">
-            {product.brand}
-          </p>
+          {product.brand ? <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-700">{product.brand}</p> : null}
           <StatusPill status={product.status} />
         </div>
 
@@ -135,7 +133,7 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {product.condition !== "Not provided" ? <ConditionPill condition={product.condition} /> : null}
-          {product.warehouse_location !== "Not provided" ? (
+          {product.warehouse_location ? (
             <span className="text-[11px] text-steel-500">{product.warehouse_location}</span>
           ) : null}
         </div>
@@ -145,12 +143,12 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
             <p className="text-xl font-extrabold tracking-tight text-navy-900">{priceLabel}</p>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {product.listing_type === "Whole Lot" ? (
               <button
                 type="button"
                 onClick={() => openEnquiry({ mode: "lot", product })}
-                className="btn-primary btn-sm"
+                className="btn-primary btn-sm sm:col-span-2"
               >
                 Enquire for Whole Lot
               </button>
@@ -162,14 +160,14 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
                   </button>
                 ) : null}
                 {wooPurchasable ? (
-                  <button type="button" onClick={onWooCommerceCheckout} className="btn-primary btn-sm min-[380px]:col-start-2">
+                  <button type="button" onClick={onWooCommerceCheckout} className="btn-primary btn-sm sm:col-start-2">
                     Buy Now
                   </button>
                 ) : null}
                 <button
                   type="button"
                   onClick={() => openEnquiry({ mode: "product", product })}
-                  className={cn("btn-sm min-[380px]:col-span-2", purchasable ? "btn-outline" : "btn-navy")}
+                  className={cn("btn-sm sm:col-span-2", purchasable ? "btn-outline" : "btn-navy")}
                 >
                   {product.status === "Sold" ? "Enquire About Similar" : "Enquire Now"}
                 </button>

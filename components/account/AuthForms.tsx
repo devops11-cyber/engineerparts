@@ -118,7 +118,7 @@ export function RegisterForm({ countries }: { countries: WooCountry[] }) {
   }
 
   return (
-    <AuthCard eyebrow="Trade customer" title="Create an account" description="Create your WooCommerce customer account for faster purchasing and account services." wide>
+    <AuthCard eyebrow="Trade customer" title="Create an account" description="Create an Engineerparts account for faster purchasing and account services." wide>
       <form onSubmit={submit} className="mt-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="First name" htmlFor="first-name"><input id="first-name" className="field" autoComplete="given-name" value={form.firstName} onChange={(event) => update("firstName", event.target.value)} required /></Field>

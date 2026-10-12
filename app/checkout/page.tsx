@@ -16,7 +16,7 @@ export default async function CheckoutPage() {
         breadcrumbs={[{ label: "Cart", href: "/cart" }, { label: "Checkout" }]}
         eyebrow="Checkout"
         title="Complete your clearance order"
-        description="Enter your billing details and review the totals calculated by WooCommerce before placing your order."
+        description="Enter your billing details and review your order total before continuing to secure payment."
         tone="light"
       />
       <section className="section pt-8">

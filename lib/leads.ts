@@ -8,6 +8,7 @@ export interface LeadInput {
   email: string;
   phone: string;
   country: string;
+  enquiry_type?: string;
   quantity?: number;
   budget?: string;
   message?: string;
@@ -64,7 +65,7 @@ const EVENT_BY_TYPE: Record<LeadType, "enquiry_submit" | "whole_lot_enquiry" | "
   general_contact: "enquiry_submit",
 };
 
-export async function submitLead(input: LeadInput): Promise<Lead> {
+export async function submitLead(input: LeadInput): Promise<Lead & { admin_email_sent?: boolean }> {
   const draft: Lead = {
     lead_id: makeLeadId(),
     lead_type: input.lead_type,
@@ -79,6 +80,7 @@ export async function submitLead(input: LeadInput): Promise<Lead> {
     email: input.email,
     phone: input.phone,
     country: input.country,
+    enquiry_type: input.enquiry_type,
     quantity: input.quantity,
     budget: input.budget,
     message: input.message,
@@ -93,10 +95,10 @@ export async function submitLead(input: LeadInput): Promise<Lead> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(draft),
   });
-  const result = (await response.json()) as { lead_id?: string; received_at?: string; error?: string };
-  if (!response.ok || !result.lead_id) throw new Error(result.error || "Unable to submit your enquiry.");
+  const result = (await response.json().catch(() => null)) as { lead_id?: string; received_at?: string; admin_email_sent?: boolean; error?: string } | null;
+  if (!response.ok || !result?.lead_id) throw new Error(result?.error || "Unable to submit your enquiry.");
   const lead = { ...draft, lead_id: result.lead_id, created_at: result.received_at ?? draft.created_at };
   persist(lead);
   track(EVENT_BY_TYPE[input.lead_type], { lead_id: lead.lead_id, sku: lead.sku, lot_id: lead.lot_id, equipment_id: lead.equipment_id, quantity: lead.quantity });
-  return lead;
+  return { ...lead, admin_email_sent: result.admin_email_sent };
 }

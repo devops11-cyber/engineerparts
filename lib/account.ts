@@ -112,7 +112,7 @@ export function validPassword(password: string): boolean {
 }
 
 export function safeRedirect(value: string | null | undefined, fallback = "/account"): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+  return value && /^\/(?![\\/])/.test(value) ? value : fallback;
 }
 
 export interface APIError {

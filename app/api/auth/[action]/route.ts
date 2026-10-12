@@ -71,7 +71,9 @@ export async function GET(request: NextRequest, { params }: { params: { action: 
   const result = await wordpressAccountRequest("auth/me", { token });
   if (result.status !== 200 || !result.data.customer) {
     const response = NextResponse.json({ authenticated: false, customer: null }, { status: 401 });
-    response.cookies.delete(SESSION_COOKIE);
+    if (result.status === 401) {
+      response.cookies.delete(SESSION_COOKIE);
+    }
     return response;
   }
   return NextResponse.json({ authenticated: true, customer: result.data.customer });

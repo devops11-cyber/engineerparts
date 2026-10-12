@@ -66,11 +66,13 @@ WooCommerce configuration is required to display products. Without it, the produ
   WOOCOMMERCE_CONSUMER_SECRET=cs_your_consumer_secret
   ENGINEERPARTS_PROXY_SECRET=generate_at_least_32_random_characters
   NEXT_PUBLIC_WHATSAPP_NUMBER=
+  NEXT_PUBLIC_CONTACT_EMAIL=
+  NEXT_PUBLIC_CONTACT_PHONE=
   ```
 
 5. Restart `npm run dev` after changing environment variables.
 
-The app fetches all published WooCommerce products in pages of 100 and caches responses for five minutes. Keys are read only by server code and are never sent to the browser. HTTPS stores use Basic Authentication; local HTTP stores use OAuth 1.0 request signing as required by WooCommerce. If the authenticated REST API rejects the key, the app falls back to WooCommerce's public Store API and still displays published products. Create the REST API key for an Administrator or Shop Manager user to expose custom metadata and create checkout orders. Product currency is read from WooCommerce's Store API. `NEXT_PUBLIC_WHATSAPP_NUMBER` is optional; omit it to hide direct WhatsApp buttons.
+The app fetches all published WooCommerce products in pages of 100 and caches responses for five minutes. Keys are read only by server code and are never sent to the browser. HTTPS stores use Basic Authentication; local HTTP stores use OAuth 1.0 request signing as required by WooCommerce. If the authenticated REST API rejects the key, the app falls back to WooCommerce's public Store API and still displays published products. Create the REST API key for an Administrator or Shop Manager user to expose custom metadata and create checkout orders. Product currency is read from WooCommerce's Store API. `NEXT_PUBLIC_WHATSAPP_NUMBER`, `NEXT_PUBLIC_CONTACT_EMAIL`, and `NEXT_PUBLIC_CONTACT_PHONE` are optional public contact details; set only company-approved values, then restart the app. Unset details are not displayed.
 
 ### Customer accounts
 

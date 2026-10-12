@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/account";
 
+function loginRedirect(request: NextRequest): NextResponse {
+  const login = new URL("/login", request.url);
+  login.searchParams.set("redirect", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  return NextResponse.redirect(login);
+}
+
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (token) {
@@ -13,14 +19,19 @@ export async function middleware(request: NextRequest) {
           cache: "no-store",
         });
         if (response.ok) return NextResponse.next();
+        if (response.status !== 401) {
+          // Account authority is erroring but hasn't said the session is invalid:
+          // ask for a fresh sign-in without clearing the cookie.
+          return loginRedirect(request);
+        }
       } catch {
-        // Fall through to a fresh sign-in when the account authority is unavailable.
+        // Account authority unreachable: ask for a fresh sign-in but keep the
+        // session cookie so it resumes once WordPress is back.
+        return loginRedirect(request);
       }
     }
   }
-  const login = new URL("/login", request.url);
-  login.searchParams.set("redirect", `${request.nextUrl.pathname}${request.nextUrl.search}`);
-  const response = NextResponse.redirect(login);
+  const response = loginRedirect(request);
   response.cookies.delete(SESSION_COOKIE);
   return response;
 }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: EngineerParts Customer Accounts
  * Description: Secure customer authentication endpoints for the EngineerParts storefront.
- * Version: 1.1.1
+ * Version: 1.4.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -26,9 +26,15 @@ final class EngineerParts_Customer_Accounts {
     );
 
     public static function boot(): void {
-        add_action('init', array(self::class, 'register_enquiry_type'));
+        add_action('plugins_loaded', array(self::class, 'maybe_install_enquiries_table'), 1);
+        add_action('init', array(self::class, 'register_legacy_enquiry_type'), 0);
+        add_action('init', array(self::class, 'maybe_migrate_legacy_enquiries'), 1);
+        add_action('admin_menu', array(self::class, 'register_enquiries_admin_page'));
+        add_action('admin_post_engineerparts_update_enquiry', array(self::class, 'update_enquiry_admin'));
+        add_action('admin_post_engineerparts_delete_enquiry', array(self::class, 'delete_enquiry_admin'));
         add_action('rest_api_init', array(self::class, 'register_routes'));
         add_action('engineerparts_purge_sessions', array(self::class, 'purge_sessions'));
+        add_filter('woocommerce_get_checkout_order_received_url', array(self::class, 'order_received_url'), 10, 2);
     }
 
     public static function activate(): void {
@@ -49,6 +55,8 @@ final class EngineerParts_Customer_Accounts {
             KEY user_id (user_id),
             KEY expires_at (expires_at)
         ) {$charset};");
+
+        self::install_enquiries_table();
 
         if (!wp_next_scheduled('engineerparts_purge_sessions')) {
             wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'engineerparts_purge_sessions');
@@ -73,6 +81,7 @@ final class EngineerParts_Customer_Accounts {
         self::route('/account/addresses', 'PUT', 'update_addresses');
         self::route('/account/security/password', 'PUT', 'change_password');
         self::route('/account/orders', 'GET', 'orders');
+        self::route('/account/orders/(?P<id>\d+)/payment-link', 'POST', 'create_payment_link');
         self::route('/account/orders/(?P<id>\d+)', 'GET', 'order');
         self::route('/account/orders/(?P<id>\d+)/reorder', 'POST', 'reorder');
         self::route('/account/enquiries', 'GET', 'enquiries');
@@ -82,16 +91,315 @@ final class EngineerParts_Customer_Accounts {
         self::route('/enquiries', 'POST', 'submit_enquiry');
     }
 
-    public static function register_enquiry_type(): void {
-        register_post_type('engineerparts_enquiry', array(
-            'labels' => array('name' => 'EngineerParts Enquiries', 'singular_name' => 'EngineerParts Enquiry'),
+    public static function maybe_install_enquiries_table(): void {
+        if (get_option('engineerparts_enquiries_db_version') === '1.3.0') {
+            return;
+        }
+        if (!self::install_enquiries_table()) {
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'enquiries',
+                'category' => 'table_install_failed',
+            )));
+        }
+    }
+
+    public static function register_legacy_enquiry_type(): void {
+        register_post_type('ep_enquiry', array(
             'public' => false,
-            'show_ui' => true,
-            'show_in_menu' => 'woocommerce',
-            'supports' => array('title'),
-            'capability_type' => 'post',
-            'map_meta_cap' => true,
+            'show_ui' => false,
+            'show_in_menu' => false,
+            'supports' => array('title', 'editor'),
         ));
+    }
+
+    public static function maybe_migrate_legacy_enquiries(): void {
+        if (get_option('engineerparts_enquiries_db_version') === '1.3.0') {
+            return;
+        }
+        if (self::install_enquiries_table() && self::migrate_legacy_enquiries()) {
+            update_option('engineerparts_enquiries_db_version', '1.3.0');
+        }
+    }
+
+    private static function install_enquiries_table(): bool {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $table = self::enquiries_table();
+        $charset = $wpdb->get_charset_collate();
+        dbDelta("CREATE TABLE {$table} (
+            id bigint unsigned NOT NULL AUTO_INCREMENT,
+            enquiry_reference varchar(40) DEFAULT NULL,
+            customer_id bigint unsigned NOT NULL DEFAULT 0,
+            lead_type varchar(40) NOT NULL DEFAULT '',
+            enquiry_type varchar(100) NOT NULL DEFAULT '',
+            product_id bigint unsigned NOT NULL DEFAULT 0,
+            product_name text NOT NULL,
+            sku varchar(191) NOT NULL DEFAULT '',
+            requested_quantity int unsigned NOT NULL DEFAULT 0,
+            message text NOT NULL,
+            company varchar(191) NOT NULL DEFAULT '',
+            contact varchar(191) NOT NULL DEFAULT '',
+            email varchar(191) NOT NULL DEFAULT '',
+            phone varchar(100) NOT NULL DEFAULT '',
+            country varchar(100) NOT NULL DEFAULT '',
+            status varchar(40) NOT NULL DEFAULT 'submitted',
+            source varchar(100) NOT NULL DEFAULT 'web',
+            created_at varchar(35) NOT NULL DEFAULT '',
+            updated_at varchar(35) NOT NULL DEFAULT '',
+            PRIMARY KEY  (id),
+            UNIQUE KEY enquiry_reference (enquiry_reference),
+            KEY customer_id (customer_id),
+            KEY email (email),
+            KEY created_at (created_at)
+        ) {$charset};");
+        return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table))) === $table;
+    }
+
+    private static function migrate_legacy_enquiries(): bool {
+        global $wpdb;
+        $table = self::enquiries_table();
+        $posts = get_posts(array(
+            'post_type' => 'ep_enquiry',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+        ));
+        foreach ($posts as $post) {
+            $reference = (string) get_post_meta($post->ID, 'enquiry_reference', true);
+            if (!$reference) {
+                $reference = 'EP-LEGACY-' . (int) $post->ID;
+            }
+            if ($wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE enquiry_reference = %s", $reference))) {
+                continue;
+            }
+            $created_at = (string) get_post_meta($post->ID, 'created_at', true);
+            $row = array(
+                'enquiry_reference' => $reference,
+                'customer_id' => (int) get_post_meta($post->ID, 'customer_id', true),
+                'lead_type' => (string) get_post_meta($post->ID, 'lead_type', true),
+                'enquiry_type' => (string) get_post_meta($post->ID, 'enquiry_type', true),
+                'product_id' => (int) get_post_meta($post->ID, 'product_id', true),
+                'product_name' => (string) get_post_meta($post->ID, 'product_name', true),
+                'sku' => (string) get_post_meta($post->ID, 'sku', true),
+                'requested_quantity' => (int) get_post_meta($post->ID, 'requested_quantity', true),
+                'message' => (string) get_post_meta($post->ID, 'message', true),
+                'company' => (string) get_post_meta($post->ID, 'company', true),
+                'contact' => (string) get_post_meta($post->ID, 'contact', true),
+                'email' => (string) get_post_meta($post->ID, 'email', true),
+                'phone' => (string) get_post_meta($post->ID, 'phone', true),
+                'country' => (string) get_post_meta($post->ID, 'country', true),
+                'status' => (string) get_post_meta($post->ID, 'status', true) ?: 'submitted',
+                'source' => (string) get_post_meta($post->ID, 'source', true) ?: 'web',
+                'created_at' => $created_at ?: get_post_time(DATE_ATOM, true, $post),
+                'updated_at' => (string) get_post_meta($post->ID, 'updated_at', true) ?: get_post_modified_time(DATE_ATOM, true, $post),
+            );
+            if ($wpdb->insert($table, $row) === false) {
+                error_log(wp_json_encode(array(
+                    'timestamp' => gmdate(DATE_ATOM),
+                    'endpoint' => 'enquiries',
+                    'category' => 'legacy_migration_failed',
+                    'postId' => (int) $post->ID,
+                    'databaseError' => $wpdb->last_error,
+                )));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static function register_enquiries_admin_page(): void {
+        add_submenu_page(
+            'woocommerce',
+            'EngineerParts Enquiries',
+            'EngineerParts Enquiries',
+            'manage_woocommerce',
+            'engineerparts-enquiries',
+            array(self::class, 'render_enquiries_admin_page')
+        );
+    }
+
+    public static function render_enquiries_admin_page(): void {
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(esc_html__('You do not have permission to view enquiries.', 'engineerparts'));
+        }
+        global $wpdb;
+        $table = self::enquiries_table();
+        $reference = isset($_GET['reference']) ? sanitize_text_field(wp_unslash($_GET['reference'])) : '';
+        echo '<div class="wrap"><h1>EngineerParts Enquiries</h1>';
+        $notice = isset($_GET['notice']) ? sanitize_key(wp_unslash($_GET['notice'])) : '';
+        if ($notice === 'saved') {
+            echo '<div class="notice notice-success is-dismissible"><p>Enquiry updated.</p></div>';
+        } elseif ($notice === 'deleted') {
+            echo '<div class="notice notice-success is-dismissible"><p>Enquiry deleted.</p></div>';
+        } elseif ($notice === 'not_found') {
+            echo '<div class="notice notice-error"><p>That enquiry no longer exists; it may have been deleted.</p></div>';
+        } elseif ($notice === 'error') {
+            echo '<div class="notice notice-error"><p>Unable to update or delete the enquiry. Please try again.</p></div>';
+        }
+        if ($reference !== '') {
+            $enquiry = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE enquiry_reference = %s", $reference), ARRAY_A);
+            if (!$enquiry) {
+                echo '<p>Enquiry not found.</p>';
+            } elseif (isset($_GET['edit']) && $_GET['edit'] === '1') {
+                self::render_enquiry_edit_form($enquiry);
+            } else {
+                echo '<p><a href="' . esc_url(admin_url('admin.php?page=engineerparts-enquiries')) . '">&larr; All enquiries</a></p>';
+                echo '<p><a class="button button-primary" href="' . esc_url(add_query_arg(
+                    array('page' => 'engineerparts-enquiries', 'reference' => $reference, 'edit' => '1'),
+                    admin_url('admin.php')
+                )) . '">Edit enquiry</a></p>';
+                echo '<table class="widefat striped"><tbody>';
+                $labels = array(
+                    'enquiry_reference' => 'Reference', 'enquiry_type' => 'Enquiry type',
+                    'contact' => 'Name', 'company' => 'Company', 'email' => 'Email',
+                    'phone' => 'Phone', 'country' => 'Country', 'product_name' => 'Product',
+                    'sku' => 'Product / SKU / Lot reference', 'requested_quantity' => 'Quantity',
+                    'message' => 'Message', 'status' => 'Status', 'created_at' => 'Submitted',
+                );
+                foreach ($labels as $key => $label) {
+                    $value = (string) $enquiry[$key];
+                    echo '<tr><th scope="row">' . esc_html($label) . '</th><td>' . nl2br(esc_html($value)) . '</td></tr>';
+                }
+                echo '</tbody></table>';
+                echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:16px" onsubmit="return confirm(\'Permanently delete this enquiry?\')">';
+                echo '<input type="hidden" name="action" value="engineerparts_delete_enquiry">';
+                echo '<input type="hidden" name="reference" value="' . esc_attr($reference) . '">';
+                wp_nonce_field('engineerparts_delete_enquiry_' . $reference);
+                echo '<button type="submit" class="button button-link-delete">Delete enquiry</button></form>';
+            }
+        } else {
+            $enquiries = $wpdb->get_results("SELECT * FROM {$table} ORDER BY id DESC LIMIT 100", ARRAY_A);
+            if (!$enquiries) {
+                echo '<p>No enquiries have been submitted yet.</p>';
+            } else {
+                echo '<table class="widefat striped"><thead><tr><th>Reference</th><th>Name</th><th>Company</th><th>Email</th><th>Enquiry type</th><th>Submitted</th></tr></thead><tbody>';
+                foreach ($enquiries as $enquiry) {
+                    $url = add_query_arg(
+                        array('page' => 'engineerparts-enquiries', 'reference' => $enquiry['enquiry_reference']),
+                        admin_url('admin.php')
+                    );
+                    echo '<tr><td><a href="' . esc_url($url) . '">' . esc_html($enquiry['enquiry_reference']) . '</a></td>';
+                    echo '<td>' . esc_html($enquiry['contact']) . '</td><td>' . esc_html($enquiry['company']) . '</td>';
+                    echo '<td>' . esc_html($enquiry['email']) . '</td><td>' . esc_html($enquiry['enquiry_type'] ?: $enquiry['lead_type']) . '</td>';
+                    echo '<td>' . esc_html($enquiry['created_at']) . '</td></tr>';
+                }
+                echo '</tbody></table>';
+            }
+        }
+        echo '</div>';
+    }
+
+    private static function render_enquiry_edit_form(array $enquiry): void {
+        $reference = (string) $enquiry['enquiry_reference'];
+        echo '<p><a href="' . esc_url(add_query_arg(
+            array('page' => 'engineerparts-enquiries', 'reference' => $reference),
+            admin_url('admin.php')
+        )) . '">&larr; Cancel</a></p>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        echo '<input type="hidden" name="action" value="engineerparts_update_enquiry">';
+        echo '<input type="hidden" name="reference" value="' . esc_attr($reference) . '">';
+        wp_nonce_field('engineerparts_update_enquiry_' . $reference);
+        echo '<table class="form-table"><tbody>';
+        $fields = array(
+            'enquiry_type' => array('Enquiry type', 'text'),
+            'contact' => array('Name', 'text'),
+            'company' => array('Company', 'text'),
+            'email' => array('Email', 'email'),
+            'phone' => array('Phone', 'text'),
+            'country' => array('Country', 'text'),
+            'product_name' => array('Product', 'text'),
+            'sku' => array('Product / SKU / Lot reference', 'text'),
+            'requested_quantity' => array('Quantity', 'number'),
+        );
+        foreach ($fields as $key => $field) {
+            echo '<tr><th scope="row"><label for="enquiry-' . esc_attr($key) . '">' . esc_html($field[0]) . '</label></th><td>';
+            echo '<input class="regular-text" id="enquiry-' . esc_attr($key) . '" name="fields[' . esc_attr($key) . ']" type="' . esc_attr($field[1]) . '" value="' . esc_attr((string) $enquiry[$key]) . '"' . ($field[1] === 'number' ? ' min="0" step="1"' : '') . '></td></tr>';
+        }
+        echo '<tr><th scope="row"><label for="enquiry-status">Status</label></th><td><select id="enquiry-status" name="fields[status]">';
+        foreach (array('submitted', 'reviewing', 'responded', 'closed') as $status) {
+            echo '<option value="' . esc_attr($status) . '"' . selected((string) $enquiry['status'], $status, false) . '>' . esc_html(ucfirst($status)) . '</option>';
+        }
+        echo '</select></td></tr>';
+        echo '<tr><th scope="row"><label for="enquiry-message">Message</label></th><td><textarea class="large-text" rows="8" id="enquiry-message" name="fields[message]">' . esc_textarea((string) $enquiry['message']) . '</textarea></td></tr>';
+        echo '</tbody></table><p><button type="submit" class="button button-primary">Save changes</button></p></form>';
+    }
+
+    public static function update_enquiry_admin(): void {
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(esc_html__('You do not have permission to edit enquiries.', 'engineerparts'));
+        }
+        $reference = isset($_POST['reference']) ? sanitize_text_field(wp_unslash($_POST['reference'])) : '';
+        check_admin_referer('engineerparts_update_enquiry_' . $reference);
+        $submitted = isset($_POST['fields']) && is_array($_POST['fields']) ? wp_unslash($_POST['fields']) : array();
+        $email = sanitize_email($submitted['email'] ?? '');
+        $contact = sanitize_text_field($submitted['contact'] ?? '');
+        if (!$reference || !$contact || !is_email($email)) {
+            self::redirect_enquiry_admin($reference, 'error');
+        }
+        $fields = array(
+            'enquiry_type' => sanitize_text_field($submitted['enquiry_type'] ?? ''),
+            'contact' => $contact,
+            'company' => sanitize_text_field($submitted['company'] ?? ''),
+            'email' => $email,
+            'phone' => sanitize_text_field($submitted['phone'] ?? ''),
+            'country' => sanitize_text_field($submitted['country'] ?? ''),
+            'product_name' => sanitize_text_field($submitted['product_name'] ?? ''),
+            'sku' => sanitize_text_field($submitted['sku'] ?? ''),
+            'requested_quantity' => max(0, absint($submitted['requested_quantity'] ?? 0)),
+            'message' => sanitize_textarea_field($submitted['message'] ?? ''),
+            'status' => in_array(($submitted['status'] ?? ''), array('submitted', 'reviewing', 'responded', 'closed'), true)
+                ? sanitize_key($submitted['status'])
+                : 'submitted',
+            'updated_at' => gmdate(DATE_ATOM),
+        );
+        global $wpdb;
+        $exists = $wpdb->get_var($wpdb->prepare(
+            'SELECT COUNT(*) FROM ' . self::enquiries_table() . ' WHERE enquiry_reference = %s',
+            $reference
+        ));
+        if (!$exists) {
+            self::redirect_enquiry_admin($reference, 'not_found');
+        }
+        $updated = $wpdb->update(
+            self::enquiries_table(),
+            $fields,
+            array('enquiry_reference' => $reference),
+            array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s'),
+            array('%s')
+        );
+        self::redirect_enquiry_admin($reference, $updated === false ? 'error' : 'saved');
+    }
+
+    public static function delete_enquiry_admin(): void {
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(esc_html__('You do not have permission to delete enquiries.', 'engineerparts'));
+        }
+        $reference = isset($_POST['reference']) ? sanitize_text_field(wp_unslash($_POST['reference'])) : '';
+        check_admin_referer('engineerparts_delete_enquiry_' . $reference);
+        global $wpdb;
+        $deleted = $wpdb->delete(
+            self::enquiries_table(),
+            array('enquiry_reference' => $reference),
+            array('%s')
+        );
+        if ($deleted === false) {
+            self::redirect_enquiry_admin($reference, 'error');
+        }
+        wp_safe_redirect(add_query_arg(
+            array('page' => 'engineerparts-enquiries', 'notice' => 'deleted'),
+            admin_url('admin.php')
+        ));
+        exit;
+    }
+
+    private static function redirect_enquiry_admin(string $reference, string $notice): void {
+        wp_safe_redirect(add_query_arg(
+            array('page' => 'engineerparts-enquiries', 'reference' => $reference, 'notice' => $notice),
+            admin_url('admin.php')
+        ));
+        exit;
     }
 
     private static function route(string $path, string $method, string $callback): void {
@@ -124,11 +432,11 @@ final class EngineerParts_Customer_Accounts {
         if (!$first_name || !$last_name || !is_email($email) || !$phone || !self::valid_password($password)) {
             return self::error('Unable to create your account. Please check the information and try again.', 422);
         }
-        if (email_exists($email)) {
-            return self::error('An account already exists with this email address. Please sign in instead.', 409, 'email_exists');
-        }
         if (!self::rate_limit('register', self::client_identifier($request), 5, HOUR_IN_SECONDS)) {
             return self::error('Too many registration attempts. Please try again later.', 429);
+        }
+        if (email_exists($email)) {
+            return self::error('An account already exists with this email address. Please sign in instead.', 409, 'email_exists');
         }
 
         $customer_id = wc_create_new_customer($email, '', $password, array(
@@ -166,7 +474,7 @@ final class EngineerParts_Customer_Accounts {
         $data = self::json($request);
         $email = sanitize_email($data['email'] ?? '');
         $password = (string) ($data['password'] ?? '');
-        $identifier = self::client_identifier($request) . '|' . strtolower($email);
+        $identifier = strtolower($email);
 
         if (!self::rate_limit('login', $identifier, 10, 15 * MINUTE_IN_SECONDS)) {
             return self::error('Too many sign-in attempts. Please try again later.', 429);
@@ -242,7 +550,7 @@ final class EngineerParts_Customer_Accounts {
     public static function resend_verification(WP_REST_Request $request): WP_REST_Response {
         $data = self::json($request);
         $email = sanitize_email($data['email'] ?? '');
-        if (self::rate_limit('resend', self::client_identifier($request) . '|' . strtolower($email), 3, HOUR_IN_SECONDS)) {
+        if (self::rate_limit('resend', strtolower($email), 3, HOUR_IN_SECONDS)) {
             $user = get_user_by('email', $email);
             if ($user && get_user_meta($user->ID, self::VERIFIED_META, true) !== '1') {
                 self::send_verification($user->ID, $email);
@@ -254,7 +562,7 @@ final class EngineerParts_Customer_Accounts {
     public static function forgot_password(WP_REST_Request $request): WP_REST_Response {
         $data = self::json($request);
         $email = sanitize_email($data['email'] ?? '');
-        $identifier = self::client_identifier($request) . '|' . strtolower($email);
+        $identifier = strtolower($email);
 
         if (self::rate_limit('forgot', $identifier, 3, HOUR_IN_SECONDS)) {
             $user = get_user_by('email', $email);
@@ -282,7 +590,7 @@ final class EngineerParts_Customer_Accounts {
         if (!self::valid_password($password)) {
             return self::error('Password must be at least 8 characters and contain letters and numbers.', 422);
         }
-        if (!self::rate_limit('reset', self::client_identifier($request) . '|' . strtolower($login), 5, HOUR_IN_SECONDS)) {
+        if (!self::rate_limit('reset', strtolower($login), 5, HOUR_IN_SECONDS)) {
             return self::error('Too many reset attempts. Please request a new password reset email.', 429);
         }
 
@@ -392,6 +700,40 @@ final class EngineerParts_Customer_Accounts {
         return self::success(array('order' => self::order_detail($order)));
     }
 
+    public static function create_payment_link(WP_REST_Request $request): WP_REST_Response {
+        $user_id = self::authenticated_user_id($request);
+        if (!$user_id) return self::error('Authentication required.', 401, 'unauthenticated');
+        $order = wc_get_order((int) $request['id']);
+        if (!$order || (int) $order->get_customer_id() !== $user_id || !$order->needs_payment()) {
+            return self::error('Order not found or does not require payment.', 404, 'not_found');
+        }
+
+        return self::success(array('paymentUrl' => self::payment_handoff_url($order)));
+    }
+
+    /**
+     * WooCommerce's own pay-for-order URL is scoped to this single order via its
+     * order key and requires no WordPress session, so it can be handed out and
+     * followed without granting the visitor a logged-in session of any kind.
+     */
+    private static function payment_handoff_url(WC_Order $order): string {
+        return $order->get_checkout_payment_url();
+    }
+
+    /**
+     * Sends the customer to the headless frontend's confirmation page instead of
+     * WooCommerce's own thank-you page after a gateway redirects back. The order
+     * key travels in the URL the same way it does for payment_handoff_url above,
+     * so the frontend can look the order up without a WordPress session.
+     */
+    public static function order_received_url($url, $order) {
+        if (!$order instanceof WC_Order) return $url;
+        return add_query_arg(array(
+            'order_id' => $order->get_id(),
+            'order_key' => $order->get_order_key(),
+        ), self::frontend_url() . '/checkout/success');
+    }
+
     public static function reorder(WP_REST_Request $request): WP_REST_Response {
         $user_id = self::authenticated_user_id($request);
         if (!$user_id) return self::error('Authentication required.', 401, 'unauthenticated');
@@ -422,12 +764,13 @@ final class EngineerParts_Customer_Accounts {
     public static function enquiries(WP_REST_Request $request): WP_REST_Response {
         $user_id = self::authenticated_user_id($request);
         if (!$user_id) return self::error('Authentication required.', 401, 'unauthenticated');
-        $posts = get_posts(array(
-            'post_type' => 'engineerparts_enquiry', 'post_status' => 'private', 'numberposts' => 100,
-            'orderby' => 'date', 'order' => 'DESC',
-            'meta_query' => array(array('key' => 'customer_id', 'value' => (string) $user_id, 'compare' => '=')),
-        ));
-        return self::success(array('enquiries' => array_map(array(self::class, 'enquiry_payload'), $posts)));
+        global $wpdb;
+        $table = self::enquiries_table();
+        $rows = $wpdb->get_results(
+            $wpdb->prepare("SELECT * FROM {$table} WHERE customer_id = %d ORDER BY id DESC LIMIT 100", $user_id),
+            ARRAY_A
+        );
+        return self::success(array('enquiries' => array_map(array(self::class, 'enquiry_payload'), $rows ?: array())));
     }
 
     public static function claim_enquiries(WP_REST_Request $request): WP_REST_Response {
@@ -437,31 +780,38 @@ final class EngineerParts_Customer_Accounts {
         $references = isset($data['references']) && is_array($data['references']) ? array_slice($data['references'], 0, 200) : array();
         $user = get_userdata($user_id);
         $claimed = 0;
+        global $wpdb;
+        $table = self::enquiries_table();
         foreach ($references as $reference) {
             $reference = sanitize_text_field($reference);
-            $posts = get_posts(array(
-                'post_type' => 'engineerparts_enquiry', 'post_status' => 'private', 'numberposts' => 1,
-                'meta_query' => array(
-                    'relation' => 'AND',
-                    array('key' => 'enquiry_reference', 'value' => $reference, 'compare' => '='),
-                    array('key' => 'email', 'value' => $user->user_email, 'compare' => '='),
-                    array('key' => 'customer_id', 'value' => '0', 'compare' => '='),
-                ),
-            ));
-            if ($posts) {
-                update_post_meta($posts[0]->ID, 'customer_id', (string) $user_id);
-                $claimed++;
+            $updated = $wpdb->update(
+                $table,
+                array('customer_id' => $user_id, 'updated_at' => gmdate(DATE_ATOM)),
+                array('enquiry_reference' => $reference, 'email' => $user->user_email, 'customer_id' => 0),
+                array('%d', '%s'),
+                array('%s', '%s', '%d')
+            );
+            if ($updated === false) {
+                error_log(wp_json_encode(array(
+                    'timestamp' => gmdate(DATE_ATOM),
+                    'endpoint' => 'enquiries',
+                    'category' => 'claim_failed',
+                    'databaseError' => $wpdb->last_error,
+                )));
+            } else {
+                $claimed += $updated;
             }
         }
         return self::success(array('claimed' => $claimed));
     }
 
     public static function submit_enquiry(WP_REST_Request $request): WP_REST_Response {
+        global $wpdb;
         $data = self::json($request);
         $email = sanitize_email($data['email'] ?? '');
         $contact = sanitize_text_field($data['contact'] ?? '');
         if (!is_email($email) || !$contact) return self::error('Please provide a valid name and email address.', 422);
-        if (!self::rate_limit('enquiry', self::client_identifier($request) . '|' . strtolower($email), 10, HOUR_IN_SECONDS)) {
+        if (!self::rate_limit('enquiry', strtolower($email), 10, HOUR_IN_SECONDS)) {
             return self::error('Too many enquiries have been submitted. Please try again later.', 429);
         }
         $user_id = self::authenticated_user_id($request);
@@ -469,30 +819,91 @@ final class EngineerParts_Customer_Accounts {
             $user = get_userdata($user_id);
             $email = $user->user_email;
         }
-        $post_id = wp_insert_post(array(
-            'post_type' => 'engineerparts_enquiry', 'post_status' => 'private',
-            'post_title' => 'New EngineerParts enquiry', 'post_author' => 0,
-        ), true);
-        if (is_wp_error($post_id)) {
-            self::log_failure('enquiries', 'create', $post_id);
+        $table = self::enquiries_table();
+        $fields = array(
+            'customer_id' => $user_id,
+            'lead_type' => sanitize_key($data['lead_type'] ?? 'general_contact'),
+            'enquiry_type' => sanitize_text_field($data['enquiry_type'] ?? ''),
+            'product_id' => absint($data['product_id'] ?? 0),
+            'product_name' => sanitize_text_field($data['product_name'] ?? ''),
+            'sku' => sanitize_text_field($data['sku'] ?? ''),
+            'requested_quantity' => max(0, absint($data['quantity'] ?? 0)),
+            'message' => sanitize_textarea_field($data['message'] ?? ''),
+            'company' => sanitize_text_field($data['company'] ?? ''),
+            'contact' => $contact,
+            'email' => $email,
+            'phone' => sanitize_text_field($data['phone'] ?? ''),
+            'country' => sanitize_text_field($data['country'] ?? ''),
+            'status' => 'submitted',
+            'source' => sanitize_key($data['source'] ?? 'web'),
+            'created_at' => gmdate(DATE_ATOM),
+            'updated_at' => gmdate(DATE_ATOM),
+        );
+        if ($wpdb->insert($table, $fields) === false) {
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'enquiries',
+                'category' => 'create_failed',
+                'databaseError' => $wpdb->last_error,
+            )));
             return self::error('Unable to submit your enquiry right now.', 502);
         }
-        $reference = sprintf('EP-RFQ-%s-%06d', gmdate('Y'), $post_id);
-        wp_update_post(array('ID' => $post_id, 'post_title' => $reference));
-        $fields = array(
-            'enquiry_reference' => $reference, 'customer_id' => (string) $user_id,
-            'lead_type' => sanitize_key($data['lead_type'] ?? 'general_contact'),
-            'product_id' => absint($data['product_id'] ?? 0), 'product_name' => sanitize_text_field($data['product_name'] ?? ''),
-            'sku' => sanitize_text_field($data['sku'] ?? ''), 'requested_quantity' => max(0, absint($data['quantity'] ?? 0)),
-            'message' => sanitize_textarea_field($data['message'] ?? ''), 'company' => sanitize_text_field($data['company'] ?? ''),
-            'contact' => $contact, 'email' => $email, 'phone' => sanitize_text_field($data['phone'] ?? ''),
-            'country' => sanitize_text_field($data['country'] ?? ''), 'status' => 'submitted',
-            'source' => sanitize_key($data['source'] ?? 'web'), 'created_at' => gmdate(DATE_ATOM), 'updated_at' => gmdate(DATE_ATOM),
+        $enquiry_id = (int) $wpdb->insert_id;
+        $reference_id = $enquiry_id;
+        do {
+            $reference = sprintf('EP-RFQ-%s-%06d', gmdate('Y'), $reference_id++);
+            $reference_exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$table} WHERE enquiry_reference = %s",
+                $reference
+            ));
+        } while ($reference_exists);
+        if ($wpdb->update($table, array('enquiry_reference' => $reference), array('id' => $enquiry_id), array('%s'), array('%d')) === false) {
+            $wpdb->delete($table, array('id' => $enquiry_id), array('%d'));
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'enquiries',
+                'category' => 'reference_save_failed',
+                'databaseError' => $wpdb->last_error,
+            )));
+            return self::error('Unable to submit your enquiry right now.', 502);
+        }
+        $details = implode("\n", array(
+            "Reference: {$reference}",
+            'Enquiry type: ' . ($fields['enquiry_type'] ?: $fields['lead_type']),
+            "Name: {$contact}",
+            'Company: ' . $fields['company'],
+            "Email: {$email}",
+            'Phone: ' . $fields['phone'],
+            'Country: ' . $fields['country'],
+            'Product / SKU / Lot reference: ' . $fields['sku'],
+            "Message:\n" . $fields['message'],
+        ));
+        $admin_email = sanitize_email(get_option('admin_email'));
+        $admin_sent = is_email($admin_email) && wp_mail(
+            $admin_email,
+            "New EngineerParts contact enquiry {$reference}",
+            "A new contact enquiry was submitted:\n\n{$details}",
+            array("Reply-To: {$contact} <{$email}>")
         );
-        foreach ($fields as $key => $value) update_post_meta($post_id, $key, $value);
-        wp_mail(get_option('admin_email'), "New enquiry {$reference}", "A new EngineerParts enquiry has been submitted.\nReference: {$reference}\nCustomer: {$contact}\nEmail: {$email}");
-        wp_mail($email, "EngineerParts enquiry {$reference}", "We received your enquiry.\nReference: {$reference}\nOur team will review it and respond shortly.");
-        return self::success(array('lead_id' => $reference, 'received_at' => $fields['created_at']), 201);
+        $customer_sent = wp_mail(
+            $email,
+            "We received your EngineerParts enquiry {$reference}",
+            "Thank you for contacting EngineerParts. We received your enquiry:\n\n{$details}\n\nOur team will respond during the next working day."
+        );
+        foreach (array('admin_notification' => $admin_sent, 'customer_confirmation' => $customer_sent) as $category => $sent) {
+            if (!$sent) {
+                error_log(wp_json_encode(array(
+                    'timestamp' => gmdate(DATE_ATOM),
+                    'endpoint' => 'enquiries',
+                    'category' => $category . '_mail_failed',
+                )));
+            }
+        }
+        return self::success(array(
+            'lead_id' => $reference,
+            'received_at' => $fields['created_at'],
+            'admin_email_sent' => $admin_sent,
+        ), 201);
     }
 
     public static function saved_products(WP_REST_Request $request): WP_REST_Response {
@@ -657,7 +1068,9 @@ final class EngineerParts_Customer_Accounts {
     private static function order_detail($order): array {
         $payload = self::order_summary($order);
         $payload['paymentMethod'] = $order->get_payment_method_title();
-        $payload['paymentUrl'] = $order->needs_payment() ? $order->get_checkout_payment_url() : '';
+        $payload['paymentUrl'] = $order->needs_payment()
+            ? self::payment_handoff_url($order)
+            : '';
         $payload['transactionReference'] = $order->get_transaction_id();
         $payload['customerNote'] = $order->get_customer_note();
         $payload['subtotal'] = (float) $order->get_subtotal();
@@ -686,13 +1099,16 @@ final class EngineerParts_Customer_Accounts {
         );
     }
 
-    public static function enquiry_payload(WP_Post $post): array {
-        $meta = static fn(string $key): string => (string) get_post_meta($post->ID, $key, true);
+    public static function enquiry_payload(array $row): array {
         return array(
-            'reference' => $meta('enquiry_reference'), 'date' => $meta('created_at'),
-            'productId' => (int) $meta('product_id'), 'productName' => $meta('product_name'),
-            'sku' => $meta('sku'), 'quantity' => (int) $meta('requested_quantity'),
-            'message' => $meta('message'), 'status' => $meta('status'),
+            'reference' => (string) $row['enquiry_reference'],
+            'date' => (string) $row['created_at'],
+            'productId' => (int) $row['product_id'],
+            'productName' => (string) $row['product_name'],
+            'sku' => (string) $row['sku'],
+            'quantity' => (int) $row['requested_quantity'],
+            'message' => (string) $row['message'],
+            'status' => (string) $row['status'],
         );
     }
 
@@ -749,6 +1165,11 @@ final class EngineerParts_Customer_Accounts {
     private static function session_table(): string {
         global $wpdb;
         return $wpdb->prefix . 'engineerparts_sessions';
+    }
+
+    private static function enquiries_table(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'engineerparts_enquiries';
     }
 
     private static function json(WP_REST_Request $request): array {

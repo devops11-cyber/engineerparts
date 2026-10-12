@@ -7,7 +7,7 @@ import { getProducts } from "@/lib/woocommerce";
 
 export const metadata: Metadata = {
   title: "Brands",
-  description: "Browse live WooCommerce products by brand.",
+  description: "Browse industrial products by brand.",
 };
 
 export default async function BrandsPage() {
@@ -21,7 +21,7 @@ export default async function BrandsPage() {
         breadcrumbs={[{ label: "Brands" }]}
         eyebrow="Brands"
         title="Products by brand"
-        description="Brands are derived from the products currently published in WooCommerce."
+        description="Browse products from the manufacturers represented in our catalogue."
       />
 
       <section className="section">

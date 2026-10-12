@@ -8,7 +8,7 @@ import { getProducts } from "@/lib/woocommerce";
 export const metadata: Metadata = {
   title: "Recently Added",
   description:
-    "Recently published products from the live Engineerparts WooCommerce catalogue.",
+    "Explore recently added industrial products and clearance stock.",
 };
 
 export default async function RecentlyAddedPage() {
@@ -21,9 +21,9 @@ export default async function RecentlyAddedPage() {
     <>
       <PageHero
         breadcrumbs={[{ label: "Recently Added" }]}
-        eyebrow="Live catalogue"
+        eyebrow="Recently added"
         title="Recently added products"
-        description="Products ordered by their WooCommerce publication date when that date is available."
+        description="Explore the latest industrial products added to our catalogue."
       />
 
       <section className="section">

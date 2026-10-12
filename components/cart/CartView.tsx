@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/components/providers/CartProvider";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
-import { formatNumber, formatPrice } from "@/lib/utils";
+import { formatNumber, formatPrice, isPublicProductValue } from "@/lib/utils";
 
 export function CartView() {
   const { items, subtotal, shipping, tax, total, shippingLabel, freeShippingRemaining, freeShippingLabel, quoteLoading, quoteError, stockValid, updateQuantity, removeItem, ready } = useCart();
@@ -33,12 +33,12 @@ export function CartView() {
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)]">
       <div className="space-y-4">
         {items.map((line) => (
-          <article key={line.productId} aria-label={`${line.name}, SKU ${line.sku}`} className="flex flex-col gap-4 rounded-card border border-navy-100 bg-white p-4 shadow-card sm:flex-row">
+          <article key={line.productId} aria-label={`${line.name}, SKU ${line.sku}`} className="card flex flex-col gap-4 p-4 sm:flex-row">
             <Link href={`/product/${line.slug}`} className="relative h-28 w-full shrink-0 overflow-hidden rounded-md border border-navy-100 bg-navy-50 sm:h-28 sm:w-36">
               <Image src={line.image} alt={line.name} fill sizes="144px" className="object-contain p-2" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-brand-700">{line.brand}</p>
+              {isPublicProductValue(line.brand, "brand") ? <p className="text-[11px] font-bold uppercase tracking-wide text-brand-700">{line.brand}</p> : null}
               <h2 className="mt-1 text-sm font-bold text-navy-900">
                 <Link href={`/product/${line.slug}`} className="hover:text-brand-700">
                   {line.name}
@@ -49,14 +49,14 @@ export function CartView() {
                   <dt>SKU</dt>
                   <dd className="font-semibold text-navy-800">{line.sku}</dd>
                 </div>
-                <div>
+                {isPublicProductValue(line.condition) ? <div>
                   <dt>Condition</dt>
                   <dd className="font-semibold text-navy-800">{line.condition}</dd>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
+                </div> : null}
+                {isPublicProductValue(line.warehouse) ? <div className="col-span-2 sm:col-span-1">
                   <dt>Warehouse</dt>
                   <dd className="font-semibold text-navy-800">{line.warehouse}</dd>
-                </div>
+                </div> : null}
               </dl>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <QuantityStepper
@@ -65,8 +65,8 @@ export function CartView() {
                   disabled={line.maxQuantity < 1}
                   onChange={(value) => updateQuantity(line.productId, value)}
                 />
-                {line.maxQuantity < 1 ? <p className="mt-2 text-xs font-semibold text-signal-700">Out of stock in WordPress. Remove this item to continue.</p> : null}
-                <p className="text-xs text-steel-500">Max {formatNumber(line.maxQuantity)} available</p>
+                {line.maxQuantity < 1 ? <p className="mt-2 text-xs font-semibold text-signal-700">Out of stock. Remove this item to continue.</p> : null}
+                <p className="text-xs text-steel-500">{formatNumber(line.maxQuantity)} units available</p>
               </div>
             </div>
             <div className="flex shrink-0 items-end justify-between gap-4 border-t border-navy-100 pt-3 sm:flex-col sm:border-0 sm:pt-0">
@@ -89,7 +89,7 @@ export function CartView() {
         ))}
       </div>
 
-      <aside aria-label="Order summary" className="h-fit rounded-card border border-navy-100 bg-white p-5 shadow-card lg:sticky lg:top-36">
+      <aside aria-label="Order summary" className="card h-fit p-5 lg:sticky lg:top-36">
         <h2 className="text-sm font-bold uppercase tracking-wide text-navy-900">Order summary</h2>
         <dl className="mt-4 space-y-3 text-sm">
           <div className="flex justify-between">
@@ -114,11 +114,11 @@ export function CartView() {
             Add {formatPrice(freeShippingRemaining, currency)} more to unlock {freeShippingLabel ?? "free shipping"}.
           </p>
         ) : null}
-        {quoteError ? <p className="mt-3 text-xs font-semibold text-signal-700">WooCommerce totals are temporarily unavailable. Product subtotal is shown.</p> : null}
+        {quoteError ? <p className="mt-3 text-xs font-semibold text-signal-700">Shipping and tax totals are temporarily unavailable. Product subtotal is shown.</p> : null}
         <p className="mt-3 text-[11px] leading-relaxed text-steel-500">
-          Product prices, shipping, VAT and totals are calculated live by WooCommerce for the selected quantities.
+          Product prices, shipping, VAT and totals reflect the selected quantities.
         </p>
-        {!stockValid ? <p role="status" className="mt-4 text-xs font-semibold text-signal-700">{quoteLoading ? "Checking current WordPress stock..." : quoteError ? "Could not verify current stock. Please reload and try again." : "Update your cart to match current WordPress stock before checkout."}</p> : null}
+        {!stockValid ? <p role="status" className="mt-4 text-xs font-semibold text-signal-700">{quoteLoading ? "Checking current stock..." : quoteError ? "Could not verify current stock. Please reload and try again." : "Update your cart to match current stock before checkout."}</p> : null}
         <Link href="/checkout" aria-disabled={!stockValid} className={`btn-primary mt-5 w-full ${stockValid ? "" : "pointer-events-none opacity-50"}`}>
           Proceed to checkout
         </Link>
