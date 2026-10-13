@@ -2,7 +2,7 @@
 /**
  * Plugin Name: EngineerParts Customer Accounts
  * Description: Secure customer authentication endpoints for the EngineerParts storefront.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -32,6 +32,8 @@ final class EngineerParts_Customer_Accounts {
         add_action('admin_menu', array(self::class, 'register_enquiries_admin_page'));
         add_action('admin_post_engineerparts_update_enquiry', array(self::class, 'update_enquiry_admin'));
         add_action('admin_post_engineerparts_delete_enquiry', array(self::class, 'delete_enquiry_admin'));
+        add_action('admin_post_engineerparts_payment_handoff', array(self::class, 'payment_handoff'));
+        add_action('admin_post_nopriv_engineerparts_payment_handoff', array(self::class, 'payment_handoff'));
         add_action('rest_api_init', array(self::class, 'register_routes'));
         add_action('engineerparts_purge_sessions', array(self::class, 'purge_sessions'));
         add_filter('woocommerce_get_checkout_order_received_url', array(self::class, 'order_received_url'), 10, 2);
@@ -697,7 +699,11 @@ final class EngineerParts_Customer_Accounts {
         if (!$user_id) return self::error('Authentication required.', 401, 'unauthenticated');
         $order = wc_get_order((int) $request['id']);
         if (!$order || (int) $order->get_customer_id() !== $user_id) return self::error('Order not found.', 404, 'not_found');
-        return self::success(array('order' => self::order_detail($order)));
+        $detail = self::order_detail($order);
+        if ($order->needs_payment() && empty($detail['paymentUrl'])) {
+            return self::error('Secure payment could not be started. Please try again later.', 503, 'payment_handoff_failed');
+        }
+        return self::success(array('order' => $detail));
     }
 
     public static function create_payment_link(WP_REST_Request $request): WP_REST_Response {
@@ -708,16 +714,80 @@ final class EngineerParts_Customer_Accounts {
             return self::error('Order not found or does not require payment.', 404, 'not_found');
         }
 
-        return self::success(array('paymentUrl' => self::payment_handoff_url($order)));
+        $payment_url = self::payment_handoff_url($order);
+        if (!$payment_url) return self::error('Secure payment could not be started. Please try again later.', 503, 'payment_handoff_failed');
+        return self::success(array('paymentUrl' => $payment_url));
     }
 
     /**
-     * WooCommerce's own pay-for-order URL is scoped to this single order via its
-     * order key and requires no WordPress session, so it can be handed out and
-     * followed without granting the visitor a logged-in session of any kind.
+     * Creates a short-lived, single-use link that signs in only the customer who
+     * owns this order before opening WooCommerce's order-payment page.
      */
-    private static function payment_handoff_url(WC_Order $order): string {
-        return $order->get_checkout_payment_url();
+    private static function payment_handoff_url(WC_Order $order): ?string {
+        $user_id = (int) $order->get_customer_id();
+        if (!$user_id) return $order->get_checkout_payment_url();
+
+        $token = bin2hex(random_bytes(32));
+        $transient = 'ep_payment_handoff_' . hash('sha256', $token);
+        if (!set_transient($transient, array('order_id' => $order->get_id(), 'user_id' => $user_id), 5 * MINUTE_IN_SECONDS)) {
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'payment_handoff',
+                'category' => 'token_storage_failed',
+                'order_id' => $order->get_id(),
+            )));
+            return null;
+        }
+
+        return add_query_arg(array(
+            'action' => 'engineerparts_payment_handoff',
+            'token' => $token,
+        ), admin_url('admin-post.php'));
+    }
+
+    public static function payment_handoff(): void {
+        nocache_headers();
+        header('Referrer-Policy: no-referrer');
+
+        $token = isset($_GET['token']) && is_string($_GET['token']) ? sanitize_text_field(wp_unslash($_GET['token'])) : '';
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            wp_die(esc_html__('This payment link is invalid or has expired.', 'engineerparts-account'), '', array('response' => 403));
+        }
+
+        $transient = 'ep_payment_handoff_' . hash('sha256', $token);
+        $lock = 'ep_payment_handoff_consume_' . hash('sha256', $token);
+        if (!add_option($lock, '1', '', 'no')) {
+            wp_die(esc_html__('This payment link has already been used or has expired.', 'engineerparts-account'), '', array('response' => 403));
+        }
+        try {
+            $handoff = get_transient($transient);
+            delete_transient($transient);
+        } finally {
+            delete_option($lock);
+        }
+
+        if (!is_array($handoff) || empty($handoff['order_id']) || empty($handoff['user_id'])) {
+            wp_die(esc_html__('This payment link is invalid or has expired.', 'engineerparts-account'), '', array('response' => 403));
+        }
+
+        $order = wc_get_order((int) $handoff['order_id']);
+        $user_id = (int) $handoff['user_id'];
+        $user = get_userdata($user_id);
+        if (!$order || !$user || (int) $order->get_customer_id() !== $user_id || !$order->needs_payment()) {
+            wp_die(esc_html__('This order is no longer available for payment.', 'engineerparts-account'), '', array('response' => 403));
+        }
+
+        wp_set_current_user($user_id);
+        $short_cookie = static fn(int $expiration): int => min($expiration, HOUR_IN_SECONDS);
+        add_filter('auth_cookie_expiration', $short_cookie, PHP_INT_MAX);
+        try {
+            wp_set_auth_cookie($user_id, false, is_ssl());
+        } finally {
+            remove_filter('auth_cookie_expiration', $short_cookie, PHP_INT_MAX);
+        }
+        do_action('wp_login', $user->user_login, $user);
+        wp_safe_redirect($order->get_checkout_payment_url());
+        exit;
     }
 
     /**

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Archivo, Inter } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/Header";
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SavedProductsProvider>
           </AuthProvider>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );

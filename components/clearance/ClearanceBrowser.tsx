@@ -334,7 +334,7 @@ export function ClearanceBrowser({
                 onClick={() => setLayout("grid")}
                 aria-label="Grid view"
                 aria-pressed={layout === "grid"}
-                className={cn("px-3 py-2.5", layout === "grid" ? "bg-navy-900 text-white" : "text-navy-700")}
+                className={cn("min-h-10 px-3 py-2.5", layout === "grid" ? "bg-navy-900 text-white" : "text-navy-700")}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
@@ -345,7 +345,7 @@ export function ClearanceBrowser({
                 onClick={() => setLayout("list")}
                 aria-label="List view"
                 aria-pressed={layout === "list"}
-                className={cn("px-3 py-2.5", layout === "list" ? "bg-navy-900 text-white" : "text-navy-700")}
+                className={cn("min-h-10 px-3 py-2.5", layout === "list" ? "bg-navy-900 text-white" : "text-navy-700")}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M4 5h16v3H4zM4 10.5h16v3H4zM4 16h16v3H4z" />

@@ -14,15 +14,9 @@ import {
 
 export function FloatingWhatsApp() {
   const pathname = usePathname();
+  const onProductPage = /^\/product\/.+$/.test(pathname);
 
   const link = useMemo(() => {
-    const productMatch = pathname.match(/^\/product\/(.+)$/);
-    if (productMatch) {
-      return whatsappLink(
-        `Hello Engineerparts.com, I would like to enquire about this product: ${absoluteUrl(pathname)}`,
-      );
-    }
-
     const lotMatch = pathname.match(/^\/lots\/(.+)$/);
     if (lotMatch) {
       const lot = lots.find(
@@ -61,13 +55,15 @@ export function FloatingWhatsApp() {
     );
   }, [pathname]);
 
+  if (onProductPage) return null;
+
   return (
     <a
       href={link}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("whatsapp_click", { source: "Floating button", page: pathname })}
-      className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2.5 rounded-full bg-emerald-500 py-3.5 pl-3.5 pr-5 text-sm font-semibold text-white shadow-lift transition-transform hover:scale-[1.03] hover:bg-emerald-600"
+      className="fixed bottom-4 right-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white shadow-lift transition-transform hover:scale-[1.03] hover:bg-emerald-600 sm:bottom-5 sm:right-5 sm:h-auto sm:w-auto sm:justify-start sm:gap-2.5 sm:py-3.5 sm:pl-3.5 sm:pr-5"
       aria-label="Chat with Engineerparts.com on WhatsApp"
     >
       <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

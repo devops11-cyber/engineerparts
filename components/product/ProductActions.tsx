@@ -149,7 +149,7 @@ export function ProductActions({ product }: { product: Product }) {
         <button
           type="button"
           onClick={() => openEnquiry({ mode: "product", product })}
-          className={purchasable ? "btn-outline" : "btn-navy sm:col-span-2"}
+          className={purchasable ? "btn-outline btn-sm" : "btn-navy sm:col-span-2"}
         >
           Enquire About This Item
         </button>
@@ -158,7 +158,7 @@ export function ProductActions({ product }: { product: Product }) {
           onClick={onWhatsApp}
           className={cn(
             "btn border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
-            !purchasable && "sm:col-span-2",
+            purchasable ? "btn-sm" : "sm:col-span-2",
           )}
         >
           WhatsApp

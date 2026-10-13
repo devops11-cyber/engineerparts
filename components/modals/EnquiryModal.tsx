@@ -180,7 +180,7 @@ export function EnquiryModal() {
           <button
             type="button"
             onClick={closeEnquiry}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-navy-200 text-navy-700 hover:bg-navy-50"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-navy-200 text-navy-700 hover:bg-navy-50"
             aria-label="Close"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

@@ -106,7 +106,7 @@ export default async function HomePage() {
             <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {inventoryStats.map(([value, label]) => (
-                  <div key={label} className="rounded-md border border-white/15 bg-white/10 px-3.5 py-3 backdrop-blur-sm">
+                  <div key={label} className="rounded-md border border-white/10 bg-navy-950/70 px-3.5 py-3 backdrop-blur-md">
                     <p className="text-lg font-extrabold text-white sm:text-xl">{value}</p>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-steel-300">{label}</p>
                   </div>

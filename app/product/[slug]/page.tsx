@@ -15,6 +15,14 @@ import { brandSlug } from "@/lib/data/brands";
 import { formatDate, formatNumber, isPublicProductValue } from "@/lib/utils";
 import { getProduct, getProducts } from "@/lib/woocommerce";
 
+function categoryLabel(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const product = await getProduct(params.slug);
   if (!product) return { title: "Product not found" };
@@ -48,10 +56,6 @@ export default async function ProductPage({ params }: { params: { slug: string }
     .slice(0, 4);
 
   const stockRows = [
-    ["Status", product.status],
-    ["Quantity available", product.quantity_available === null ? "Contact for quantity" : `${formatNumber(product.quantity_available)} units`],
-    ["Warehouse", product.warehouse_location],
-    ["Dispatch", product.lead_time],
     ["Listed", product.added_date ? formatDate(product.added_date) : "Not provided"],
   ].filter(([, value]) => isPublicProductValue(value));
 
@@ -101,7 +105,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
               <Meta label="Manufacturer part number" value={product.part_number} />
               <Meta label="Model" value={product.model} />
               <Meta label="Manufacturer" value={product.manufacturer} />
-              <Meta label="Category" value={product.subcategory} />
+              <Meta label="Category" value={categoryLabel(product.category)} />
               <Meta label="Subcategory" value={product.subcategory} />
             </dl>
 
@@ -171,7 +175,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
           <aside className="space-y-6">
             <div className="card p-5">
               <h2 className="text-sm font-bold uppercase tracking-wide text-navy-900">
-                Stock information
+                Listing details
               </h2>
               <dl className="mt-4 divide-y divide-navy-100 text-sm">
                 {stockRows.map(([label, value]) => (

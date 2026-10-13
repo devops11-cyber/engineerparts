@@ -135,7 +135,7 @@ export function BulkDealSection() {
                 value={form.message}
                 onChange={(e) => update("message", e.target.value)}
                 placeholder="Delivery location, timescales, inspection requirements."
-                className="w-full rounded-md border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-white placeholder:text-steel-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="w-full rounded-md border border-navy-600 bg-navy-800 px-3.5 py-2.5 text-sm text-white placeholder:text-steel-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             </label>
             {error ? (
@@ -185,7 +185,7 @@ function DarkField({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-navy-700 bg-navy-950 px-3.5 py-2.5 text-sm text-white placeholder:text-steel-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+        className="w-full rounded-md border border-navy-600 bg-navy-800 px-3.5 py-2.5 text-sm text-white placeholder:text-steel-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       />
     </label>
   );

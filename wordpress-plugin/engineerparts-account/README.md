@@ -42,7 +42,7 @@ No JWT plugin is required. Browser requests go only to Next.js, so WordPress COR
 - Auth endpoints require the server-to-server proxy secret and apply rate limits.
 - Unverified customers cannot sign in.
 - Every order lookup verifies that the authenticated customer owns the WooCommerce order.
-- Account checkout uses a five-minute, single-use payment handoff so WooCommerce can authenticate the owning customer before opening the order payment page.
+- Account checkout uses a five-minute, single-use payment handoff so WordPress can sign in the order owner and open the payment page. The resulting browser login expires within one hour. Customer passwords are never included in the handoff.
 - Enquiries are stored as structured rows in the `{$wpdb->prefix}engineerparts_enquiries` database table and linked to the WooCommerce customer ID.
 - Saved product IDs use the `engineerparts_saved_products` customer metadata key.
 - Existing WooCommerce customers are marked verified after their first successful password login; newly registered customers must verify by email. The storefront also accepts WooCommerce's native email confirmation when it matches the customer's current account email.

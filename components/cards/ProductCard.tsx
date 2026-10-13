@@ -164,13 +164,23 @@ export function ProductCard({ product, layout = "grid" }: { product: Product; la
                     Buy Now
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => openEnquiry({ mode: "product", product })}
-                  className={cn("btn-sm sm:col-span-2", purchasable ? "btn-outline" : "btn-navy")}
-                >
-                  {product.status === "Sold" ? "Enquire About Similar" : "Enquire Now"}
-                </button>
+                {purchasable ? (
+                  <button
+                    type="button"
+                    onClick={() => openEnquiry({ mode: "product", product })}
+                    className="link-underline sm:col-span-2 inline-flex min-h-10 items-center justify-center text-xs font-semibold text-steel-600 hover:text-brand-700"
+                  >
+                    Enquire Now
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openEnquiry({ mode: "product", product })}
+                    className="btn-navy btn-sm sm:col-span-2"
+                  >
+                    {product.status === "Sold" ? "Enquire About Similar" : "Enquire Now"}
+                  </button>
+                )}
               </>
             )}
           </div>

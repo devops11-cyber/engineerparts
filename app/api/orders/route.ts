@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     const billingAddress = wooAddress(payload.customer.billing);
     const shippingAddress = wooAddress(payload.customer.shipping ?? payload.customer.billing);
     const customer = await getCurrentCustomer();
+    const sessionToken = cookies().get(SESSION_COOKIE)?.value;
     const quote = await getWooCommerceCartQuote(
       payload.items,
       payload.customer.shipping?.country ?? payload.customer.billing.country,
@@ -163,13 +164,29 @@ export async function POST(request: NextRequest) {
         { key: "storefront_privacy_acknowledged", value: policyAcceptedAt },
       ],
     });
-    if (!order.payment_url) {
+    let paymentUrl = order.payment_url;
+    let handoffStatus: number | undefined;
+    if (customer) {
+      if (sessionToken) {
+        const handoff = await wordpressAccountRequest<{ ok: boolean; paymentUrl?: string }>(
+          `account/orders/${order.id}/payment-link`,
+          { method: "POST", token: sessionToken },
+        );
+        handoffStatus = handoff.status;
+        paymentUrl = handoff.status === 200 && handoff.data.ok ? handoff.data.paymentUrl ?? "" : "";
+      } else {
+        paymentUrl = "";
+      }
+    }
+
+    if (!paymentUrl) {
       console.error(JSON.stringify({
         timestamp: new Date().toISOString(),
         endpoint: "/api/orders",
-        category: "woocommerce_order_missing_payment_url",
+        category: customer ? "woocommerce_payment_handoff_failed" : "woocommerce_order_missing_payment_url",
         order_id: order.id,
         order_number: order.number,
+        ...(handoffStatus === undefined ? {} : { handoff_status: handoffStatus }),
       }));
       return NextResponse.json(
         {
@@ -180,15 +197,11 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
-
-    const paymentUrl = order.payment_url;
-
     if (customer && payload.saveAddress) {
-      const token = cookies().get(SESSION_COOKIE)?.value;
-      if (token) {
+      if (sessionToken) {
         await wordpressAccountRequest("account/addresses", {
           method: "PUT",
-          token,
+          token: sessionToken,
           body: {
             billing: payload.customer.billing,
             shipping: payload.customer.shipping ?? payload.customer.billing,
