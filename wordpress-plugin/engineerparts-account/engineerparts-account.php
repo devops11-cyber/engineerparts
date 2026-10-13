@@ -2,7 +2,7 @@
 /**
  * Plugin Name: EngineerParts Customer Accounts
  * Description: Secure customer authentication endpoints for the EngineerParts storefront.
- * Version: 1.5.0
+ * Version: 1.6.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -86,6 +86,7 @@ final class EngineerParts_Customer_Accounts {
         self::route('/account/orders/(?P<id>\d+)/payment-link', 'POST', 'create_payment_link');
         self::route('/account/orders/(?P<id>\d+)', 'GET', 'order');
         self::route('/account/orders/(?P<id>\d+)/reorder', 'POST', 'reorder');
+        self::route('/orders/(?P<id>\d+)/payment-link', 'POST', 'create_proxy_payment_link');
         self::route('/account/enquiries', 'GET', 'enquiries');
         self::route('/account/enquiries/claim', 'POST', 'claim_enquiries');
         self::route('/account/saved-products', 'GET', 'saved_products');
@@ -717,6 +718,67 @@ final class EngineerParts_Customer_Accounts {
         $payment_url = self::payment_handoff_url($order);
         if (!$payment_url) return self::error('Secure payment could not be started. Please try again later.', 503, 'payment_handoff_failed');
         return self::success(array('paymentUrl' => $payment_url));
+    }
+
+    public static function create_proxy_payment_link(WP_REST_Request $request): WP_REST_Response {
+        $order = wc_get_order((int) $request['id']);
+        if (!$order || !$order->needs_payment() || $order->get_payment_method() !== 'nomod') {
+            return self::error('Order not found or does not require Nomod payment.', 404, 'not_found');
+        }
+
+        $payment_url = self::nomod_payment_url($order);
+        if (!$payment_url) {
+            return self::error('Secure Nomod payment could not be started. Please try again later.', 503, 'payment_handoff_failed');
+        }
+        return self::success(array('paymentUrl' => $payment_url));
+    }
+
+    private static function nomod_payment_url(WC_Order $order): ?string {
+        try {
+            $gateways = WC()->payment_gateways()->payment_gateways();
+            $gateway = $gateways[$order->get_payment_method()] ?? null;
+            if (!$gateway || !is_callable(array($gateway, 'process_payment'))) {
+                error_log(wp_json_encode(array(
+                    'timestamp' => gmdate(DATE_ATOM),
+                    'endpoint' => 'nomod_payment_handoff',
+                    'category' => 'gateway_unavailable',
+                    'order_id' => $order->get_id(),
+                )));
+                return null;
+            }
+            $result = $gateway->process_payment($order->get_id());
+        } catch (Throwable $error) {
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'nomod_payment_handoff',
+                'category' => 'gateway_failed',
+                'order_id' => $order->get_id(),
+                'error' => get_class($error),
+            )));
+            return null;
+        }
+
+        $payment_url = is_array($result) && ($result['result'] ?? '') === 'success'
+            ? esc_url_raw($result['redirect'] ?? '')
+            : '';
+        $parts = $payment_url ? wp_parse_url($payment_url) : false;
+        $store_host = wp_parse_url(home_url('/'), PHP_URL_HOST);
+        if (
+            !$parts ||
+            strtolower((string) ($parts['scheme'] ?? '')) !== 'https' ||
+            empty($parts['host']) ||
+            strtolower((string) $parts['host']) === strtolower((string) $store_host) ||
+            !wp_http_validate_url($payment_url)
+        ) {
+            error_log(wp_json_encode(array(
+                'timestamp' => gmdate(DATE_ATOM),
+                'endpoint' => 'nomod_payment_handoff',
+                'category' => 'invalid_gateway_redirect',
+                'order_id' => $order->get_id(),
+            )));
+            return null;
+        }
+        return $payment_url;
     }
 
     /**

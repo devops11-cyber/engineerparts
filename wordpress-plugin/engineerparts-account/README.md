@@ -20,6 +20,8 @@ This plugin provides the restricted WordPress endpoints used by the EngineerPart
 
 Updating from an earlier version only requires replacing the plugin folder and reactivating it if WordPress requests activation.
 
+Headless checkout submits orders through WooCommerce's Store API checkout endpoint and follows the gateway's `payment_result.redirect_url` directly. Confirm the Nomod gateway is enabled and its WooCommerce payment method ID is `nomod`.
+
 Generate the shared secret with a password manager or `openssl rand -hex 32`. Never expose it through a `NEXT_PUBLIC_` variable.
 
 ## WordPress requirements
@@ -43,13 +45,14 @@ No JWT plugin is required. Browser requests go only to Next.js, so WordPress COR
 - Unverified customers cannot sign in.
 - Every order lookup verifies that the authenticated customer owns the WooCommerce order.
 - Account checkout uses a five-minute, single-use payment handoff so WordPress can sign in the order owner and open the payment page. The resulting browser login expires within one hour. Customer passwords are never included in the handoff.
+- Headless order checkout uses the WooCommerce Store API so the configured gateway creates its normal payment result and redirect.
 - Enquiries are stored as structured rows in the `{$wpdb->prefix}engineerparts_enquiries` database table and linked to the WooCommerce customer ID.
 - Saved product IDs use the `engineerparts_saved_products` customer metadata key.
 - Existing WooCommerce customers are marked verified after their first successful password login; newly registered customers must verify by email. The storefront also accepts WooCommerce's native email confirmation when it matches the customer's current account email.
 
 ## Account endpoints
 
-The plugin exposes controlled routes under `/wp-json/engineerparts/v1/` for authentication, profile and address updates, password changes, customer-owned orders and payment handoffs, reorder validation, enquiries, and saved products. Every route requires the server-to-server proxy secret. Customer routes additionally require a valid opaque session token.
+The plugin exposes controlled routes under `/wp-json/engineerparts/v1/` for authentication, profile and address updates, password changes, customer-owned orders and payment handoffs, headless checkout payment redirects, reorder validation, enquiries, and saved products. Every route requires the server-to-server proxy secret. Customer routes additionally require a valid opaque session token.
 
 Guest enquiry submission is proxied by Next.js and rate-limited. Enquiries are listed under **WooCommerce > EngineerParts Enquiries**. Open a reference to view, edit, or permanently delete that database row. Editing requires a name and valid email address; status can be set to Submitted, Reviewing, Responded, or Closed. On upgrade, the plugin copies existing `ep_enquiry` posts into the database table without deleting the originals. The submitted details are emailed to the WordPress admin email configured under **Settings > General** and to the customer. Guest enquiries can be claimed after login only when both the stored RFQ reference and verified account email match.
 

@@ -5,7 +5,7 @@ import { getWooCommerceCountries } from "@/lib/woocommerce";
 
 export const metadata: Metadata = {
   title: "Checkout",
-  description: "Checkout clearance stock from Engineerparts.com. Customer details, delivery or collection, and order confirmation.",
+  description: "Checkout clearance stock from Engineerparts.com. Add your details, provide a delivery address, and review your order before payment.",
 };
 
 export default async function CheckoutPage() {
@@ -16,7 +16,7 @@ export default async function CheckoutPage() {
         breadcrumbs={[{ label: "Cart", href: "/cart" }, { label: "Checkout" }]}
         eyebrow="Checkout"
         title="Complete your clearance order"
-        description="Enter your billing details and review your order total before continuing to secure payment."
+        description="Add your details, provide a delivery address, and review your order before secure payment."
         tone="light"
       />
       <section className="section pt-8">

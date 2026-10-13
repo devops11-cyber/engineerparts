@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createWooCommerceOrder, getWooCommerceCartQuote } from "@/lib/woocommerce";
+import {
+  getWooCommerceCartQuote,
+  submitWooCommerceCheckout,
+  updateWooCommerceOrder,
+} from "@/lib/woocommerce";
 import { getCurrentCustomer } from "@/lib/auth-server";
 import { wordpressAccountRequest } from "@/lib/auth-server";
 import { cookies } from "next/headers";
@@ -112,8 +116,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Invalid order details" }, { status: 400 });
     }
 
-    const billingAddress = wooAddress(payload.customer.billing);
-    const shippingAddress = wooAddress(payload.customer.shipping ?? payload.customer.billing);
+    const billingAddress = {
+      ...wooAddress(payload.customer.billing),
+      email: payload.customer.billing.email.trim(),
+      phone: payload.customer.billing.phone.trim(),
+    };
+    const shippingAddress = {
+      ...wooAddress(payload.customer.shipping ?? payload.customer.billing),
+      email: billingAddress.email,
+      phone: billingAddress.phone,
+    };
     const customer = await getCurrentCustomer();
     const sessionToken = cookies().get(SESSION_COOKIE)?.value;
     const quote = await getWooCommerceCartQuote(
@@ -135,67 +147,49 @@ export async function POST(request: NextRequest) {
       );
     }
     const policyAcceptedAt = new Date().toISOString();
-    const order = await createWooCommerceOrder({
-      customer_id: customer?.id,
-      payment_method: "nomod",
-      payment_method_title: "Nomod",
-      set_paid: false,
-      billing: {
-        ...billingAddress,
-        email: payload.customer.billing.email.trim(),
-        phone: payload.customer.billing.phone.trim(),
-      },
+    const checkout = await submitWooCommerceCheckout({
+      items: payload.items,
+      billing: billingAddress,
       shipping: shippingAddress,
-      line_items: payload.items.map((item) => ({
-        product_id: Number(item.productId),
-        quantity: item.quantity,
-      })),
-      shipping_lines: quote.shippingMethod
-        ? [{
-            method_id: quote.shippingMethod.methodId,
-            method_title: quote.shippingMethod.title,
-            total: quote.shippingMethod.total,
-          }]
-        : undefined,
-      customer_note: "",
-      meta_data: [
-        { key: "storefront_reference", value: payload.order_id },
-        { key: "storefront_terms_accepted", value: policyAcceptedAt },
-        { key: "storefront_privacy_acknowledged", value: policyAcceptedAt },
-      ],
+      customerNote: `Storefront reference: ${payload.order_id}\nTerms and privacy accepted: ${policyAcceptedAt}`,
     });
-    let paymentUrl = order.payment_url;
-    let handoffStatus: number | undefined;
-    if (customer) {
-      if (sessionToken) {
-        const handoff = await wordpressAccountRequest<{ ok: boolean; paymentUrl?: string }>(
-          `account/orders/${order.id}/payment-link`,
-          { method: "POST", token: sessionToken },
-        );
-        handoffStatus = handoff.status;
-        paymentUrl = handoff.status === 200 && handoff.data.ok ? handoff.data.paymentUrl ?? "" : "";
-      } else {
-        paymentUrl = "";
-      }
-    }
+    const paymentUrl = checkout.payment_result.redirect_url;
 
     if (!paymentUrl) {
       console.error(JSON.stringify({
         timestamp: new Date().toISOString(),
         endpoint: "/api/orders",
-        category: customer ? "woocommerce_payment_handoff_failed" : "woocommerce_order_missing_payment_url",
-        order_id: order.id,
-        order_number: order.number,
-        ...(handoffStatus === undefined ? {} : { handoff_status: handoffStatus }),
+        category: "store_api_payment_redirect_missing",
+        order_id: checkout.order_id,
       }));
       return NextResponse.json(
         {
           ok: false,
           code: "payment_handoff_failed",
-          error: `Your order (${order.number}) was created, but secure payment could not be started. Please contact support before placing another order.`,
+          error: `Your order (${checkout.order_id}) was created, but secure payment could not be started. Please contact support before placing another order.`,
         },
         { status: 502 },
       );
+    }
+    let orderNumber = String(checkout.order_id);
+    try {
+      const order = await updateWooCommerceOrder(checkout.order_id, {
+        customer_id: customer?.id,
+        meta_data: [
+          { key: "storefront_reference", value: payload.order_id },
+          { key: "storefront_terms_accepted", value: policyAcceptedAt },
+          { key: "storefront_privacy_acknowledged", value: policyAcceptedAt },
+        ],
+      });
+      orderNumber = order.number || orderNumber;
+    } catch (error) {
+      console.error(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        endpoint: "/api/orders",
+        category: "storefront_order_metadata_update_failed",
+        order_id: checkout.order_id,
+        error: error instanceof Error ? { name: error.name, message: error.message } : String(error),
+      }));
     }
     if (customer && payload.saveAddress) {
       if (sessionToken) {
@@ -213,8 +207,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      order_id: order.id,
-      order_number: order.number,
+      order_id: checkout.order_id,
+      order_number: orderNumber,
       payment_url: paymentUrl,
     });
   } catch (error) {
