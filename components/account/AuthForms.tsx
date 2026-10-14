@@ -3,9 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { CUSTOMER_TYPES, safeRedirect, validPassword, type AuthResponse } from "@/lib/account";
 import type { WooCountry } from "@/lib/woocommerce";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        callback: (token: string) => void;
+        "expired-callback": () => void;
+        "error-callback": () => void;
+      }) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 async function authRequest(action: string, body: Record<string, unknown>): Promise<AuthResponse> {
   const response = await fetch(`/api/auth/${action}`, {
@@ -98,27 +114,63 @@ export function RegisterForm({ countries }: { countries: WooCountry[] }) {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const captchaContainer = useRef<HTMLDivElement>(null);
+  const captchaWidget = useRef<string | null>(null);
+  const captchaSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
   const update = (key: keyof RegisterState, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const passwordReady = validPassword(form.password);
+
+  function renderCaptcha() {
+    if (!captchaContainer.current || !captchaSiteKey) return;
+    if (!window.turnstile) {
+      setError("CAPTCHA verification could not be loaded. Please refresh and try again.");
+      return;
+    }
+    if (captchaWidget.current) window.turnstile.remove(captchaWidget.current);
+    captchaWidget.current = window.turnstile.render(captchaContainer.current, {
+      sitekey: captchaSiteKey,
+      callback: (token) => {
+        setCaptchaToken(token);
+        setError("");
+      },
+      "expired-callback": () => {
+        setCaptchaToken("");
+        setError("CAPTCHA verification expired. Please verify again.");
+      },
+      "error-callback": () => {
+        setCaptchaToken("");
+        setError("CAPTCHA verification failed to load. Please refresh and try again.");
+      },
+    });
+  }
+
+  useEffect(() => () => {
+    if (captchaWidget.current && window.turnstile) window.turnstile.remove(captchaWidget.current);
+  }, []);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     if (!passwordReady) return setError("Password must be at least 8 characters and contain letters and numbers.");
     if (form.password !== form.confirmPassword) return setError("Passwords do not match.");
+    if (!captchaToken) return setError("Complete the CAPTCHA verification before creating your account.");
     setSubmitting(true);
     try {
       const { confirmPassword: _confirmPassword, ...payload } = form;
-      await authRequest("register", payload);
+      await authRequest("register", { ...payload, captchaToken });
       router.push(`/verify-email?sent=1&email=${encodeURIComponent(form.email)}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create your account. Please try again.");
+      setCaptchaToken("");
+      if (captchaWidget.current && window.turnstile) window.turnstile.reset(captchaWidget.current);
       setSubmitting(false);
     }
   }
 
   return (
     <AuthCard eyebrow="Trade customer" title="Create an account" description="Create an Engineerparts account for faster purchasing and account services." wide>
+      {captchaSiteKey ? <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onReady={renderCaptcha} onError={() => setError("CAPTCHA verification could not be loaded. Please refresh and try again.")} /> : null}
       <form onSubmit={submit} className="mt-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="First name" htmlFor="first-name"><input id="first-name" className="field" autoComplete="given-name" value={form.firstName} onChange={(event) => update("firstName", event.target.value)} required /></Field>
@@ -145,8 +197,13 @@ export function RegisterForm({ countries }: { countries: WooCountry[] }) {
             <Field label="Customer type" htmlFor="customer-type"><select id="customer-type" className="field" value={form.customerType} onChange={(event) => update("customerType", event.target.value)}><option value="">Select customer type</option>{CUSTOMER_TYPES.map((type) => <option key={type}>{type}</option>)}</select></Field>
           </div>
         </details>
+        <div className="mt-5" aria-label="CAPTCHA verification">
+          {captchaSiteKey
+            ? <div ref={captchaContainer} />
+            : <p role="alert" className="text-sm text-red-700">Account registration verification is unavailable. Please try again later.</p>}
+        </div>
         <FormError message={error} />
-        <button type="submit" className="btn-primary mt-5 w-full" disabled={submitting}>{submitting ? "Creating account..." : "Create account"}</button>
+        <button type="submit" className="btn-primary mt-5 w-full" disabled={submitting || !captchaSiteKey || !captchaToken}>{submitting ? "Creating account..." : "Create account"}</button>
       </form>
       <p className="mt-6 border-t border-navy-100 pt-5 text-center text-sm text-steel-600">Already registered? <Link href="/login" className="font-semibold text-brand-700">Sign in</Link></p>
     </AuthCard>

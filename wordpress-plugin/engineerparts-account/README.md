@@ -9,6 +9,7 @@ This plugin provides the restricted WordPress endpoints used by the EngineerPart
 
    ```php
    define('ENGINEERPARTS_PROXY_SECRET', 'replace-with-at-least-32-random-characters');
+   define('ENGINEERPARTS_TURNSTILE_SECRET', 'your-cloudflare-turnstile-secret-key');
    define('ENGINEERPARTS_FRONTEND_URL', 'https://engineerparts.com');
    ```
 
@@ -27,6 +28,7 @@ Generate the shared secret with a password manager or `openssl rand -hex 32`. Ne
 ## WordPress requirements
 
 - HTTPS on both WordPress and Next.js
+- Cloudflare Turnstile site key configured as `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Next.js and its secret key configured as `ENGINEERPARTS_TURNSTILE_SECRET` in `wp-config.php`. Restrict the Turnstile widget to the storefront hostname.
 - Pretty permalinks enabled
 - WooCommerce account creation enabled
 - Guest checkout left enabled for the existing storefront flow
@@ -42,6 +44,7 @@ No JWT plugin is required. Browser requests go only to Next.js, so WordPress COR
 - Next.js stores the opaque session token in an HTTP-only, `SameSite=Lax`, production-secure cookie.
 - Password reset uses WordPress-native reset keys.
 - Auth endpoints require the server-to-server proxy secret and apply rate limits.
+- Registration CAPTCHA tokens are verified by WordPress with Cloudflare Turnstile before a WooCommerce customer is created; registration fails closed if the secret is not configured or verification cannot complete.
 - Unverified customers cannot sign in.
 - Every order lookup verifies that the authenticated customer owns the WooCommerce order.
 - Account checkout uses a five-minute, single-use payment handoff so WordPress can sign in the order owner and open the payment page. The resulting browser login expires within one hour. Customer passwords are never included in the handoff.

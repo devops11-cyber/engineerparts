@@ -2,7 +2,7 @@
 /**
  * Plugin Name: EngineerParts Customer Accounts
  * Description: Secure customer authentication endpoints for the EngineerParts storefront.
- * Version: 1.6.0
+ * Version: 1.7.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -437,6 +437,10 @@ final class EngineerParts_Customer_Accounts {
         }
         if (!self::rate_limit('register', self::client_identifier($request), 5, HOUR_IN_SECONDS)) {
             return self::error('Too many registration attempts. Please try again later.', 429);
+        }
+        $captcha_error = self::verify_turnstile((string) ($data['captchaToken'] ?? ''));
+        if ($captcha_error) {
+            return $captcha_error;
         }
         if (email_exists($email)) {
             return self::error('An account already exists with this email address. Please sign in instead.', 409, 'email_exists');
@@ -1302,6 +1306,33 @@ final class EngineerParts_Customer_Accounts {
     private static function enquiries_table(): string {
         global $wpdb;
         return $wpdb->prefix . 'engineerparts_enquiries';
+    }
+
+    private static function verify_turnstile(string $token): ?WP_REST_Response {
+        $secret = defined('ENGINEERPARTS_TURNSTILE_SECRET') ? trim((string) ENGINEERPARTS_TURNSTILE_SECRET) : '';
+        if ($secret === '') {
+            return self::error('Account registration verification is not configured.', 503);
+        }
+        if ($token === '' || strlen($token) > 4096) {
+            return self::error('Please complete the CAPTCHA verification and try again.', 422, 'captcha_required');
+        }
+
+        $response = wp_remote_post('https://challenges.cloudflare.com/turnstile/v0/siteverify', array(
+            'timeout' => 8,
+            'body' => array(
+                'secret' => $secret,
+                'response' => $token,
+            ),
+        ));
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) < 200 || wp_remote_retrieve_response_code($response) >= 300) {
+            return self::error('Unable to verify CAPTCHA right now. Please try again.', 503);
+        }
+
+        $result = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($result) || empty($result['success'])) {
+            return self::error('CAPTCHA verification failed. Please try again.', 422, 'captcha_failed');
+        }
+        return null;
     }
 
     private static function json(WP_REST_Request $request): array {

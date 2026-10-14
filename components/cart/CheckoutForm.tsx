@@ -30,6 +30,8 @@ interface CheckoutState {
   sameAsBilling: boolean;
   saveAddress: boolean;
   acceptPolicies: boolean;
+  trn: string;
+  customerNote: string;
 }
 
 type CheckoutStep = 1 | 2 | 3;
@@ -54,6 +56,8 @@ const EMPTY: CheckoutState = {
   sameAsBilling: true,
   saveAddress: false,
   acceptPolicies: false,
+  trn: "",
+  customerNote: "",
 };
 
 export function CheckoutForm({ countries }: { countries: WooCountry[] }) {
@@ -193,6 +197,8 @@ export function CheckoutForm({ countries }: { countries: WooCountry[] }) {
       items: items.map(({ productId, quantity }) => ({ productId, quantity })),
       saveAddress: authenticated && form.saveAddress,
       acceptPolicies: form.acceptPolicies,
+      trn: purchaseType === "business" ? form.trn.trim() : "",
+      customer_note: form.customerNote.trim(),
     };
 
     try {
@@ -312,10 +318,21 @@ export function CheckoutForm({ countries }: { countries: WooCountry[] }) {
                 <input type="tel" autoComplete="tel" inputMode="tel" className="field" value={form.billing.phone} onChange={(event) => updateAddress("phone", event.target.value)} placeholder="+971 50 123 4567" />
               </label>
               {purchaseType === "business" ? (
-                <label className="block sm:col-span-2">
-                  <span className="field-label">Company name *</span>
-                  <input autoComplete="organization" className="field" value={form.billing.company} onChange={(event) => updateAddress("company", event.target.value)} />
-                </label>
+                <>
+                  <label className="block sm:col-span-2">
+                    <span className="field-label">Company name *</span>
+                    <input autoComplete="organization" className="field" value={form.billing.company} onChange={(event) => updateAddress("company", event.target.value)} />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="field-label">Tax registration number (optional)</span>
+                    <input
+                      className="field"
+                      value={form.trn}
+                      maxLength={50}
+                      onChange={(event) => setForm((current) => ({ ...current, trn: event.target.value }))}
+                    />
+                  </label>
+                </>
               ) : null}
             </div>
             <div className="mt-6 flex items-center justify-between gap-3">
@@ -402,7 +419,12 @@ export function CheckoutForm({ countries }: { countries: WooCountry[] }) {
               <dl className="mt-3 divide-y divide-navy-100 border-y border-navy-100 text-sm">
               <div className="py-3">
                 <dt className="font-semibold text-navy-900">Customer</dt>
-                <dd className="mt-1 text-steel-600">{form.billing.firstName} {form.billing.lastName}{purchaseType === "business" && form.billing.company ? ` · ${form.billing.company}` : ""}<br />{form.billing.email}<br />{form.billing.phone}</dd>
+                <dd className="mt-1 text-steel-600">
+                  {form.billing.firstName} {form.billing.lastName}
+                  {purchaseType === "business" && form.billing.company ? ` · ${form.billing.company}` : ""}
+                  <br />{form.billing.email}<br />{form.billing.phone}
+                  {purchaseType === "business" && form.trn.trim() ? <><br />TRN: {form.trn.trim()}</> : null}
+                </dd>
               </div>
               <div className="py-3">
                 <dt className="font-semibold text-navy-900">Delivery address</dt>
@@ -418,6 +440,17 @@ export function CheckoutForm({ countries }: { countries: WooCountry[] }) {
                 ))}
               </ul>
             </section>
+            <label className="mt-5 block">
+              <span className="field-label">Order notes (optional)</span>
+              <textarea
+                className="field min-h-24"
+                rows={3}
+                maxLength={2000}
+                value={form.customerNote}
+                onChange={(event) => setForm((current) => ({ ...current, customerNote: event.target.value }))}
+                placeholder="Add delivery instructions or other information for our team."
+              />
+            </label>
             <label className="mt-5 flex items-start gap-2 text-sm text-navy-800">
               <input
                 type="checkbox"

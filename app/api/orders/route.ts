@@ -22,6 +22,8 @@ interface OrderPayload {
   items: Array<{ productId: string; quantity: number }>;
   saveAddress?: boolean;
   acceptPolicies: true;
+  trn?: string;
+  customer_note?: string;
 }
 
 interface CustomerAddress {
@@ -64,6 +66,9 @@ function validPayload(value: unknown): value is OrderPayload {
             item.quantity > 0,
         ),
       ) &&
+      (payload.trn === undefined || (typeof payload.trn === "string" && payload.trn.length <= 50)) &&
+      (payload.customer_note === undefined ||
+        (typeof payload.customer_note === "string" && payload.customer_note.length <= 2000)) &&
       (customer?.shipping === undefined || validAddress(customer.shipping)),
   );
 }
@@ -147,11 +152,19 @@ export async function POST(request: NextRequest) {
       );
     }
     const policyAcceptedAt = new Date().toISOString();
+    const customerNote = [
+      payload.customer_note?.trim(),
+      payload.trn?.trim() ? `TRN: ${payload.trn.trim()}` : "",
+      `Storefront reference: ${payload.order_id}`,
+      `Terms and privacy accepted: ${policyAcceptedAt}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
     const checkout = await submitWooCommerceCheckout({
       items: payload.items,
       billing: billingAddress,
       shipping: shippingAddress,
-      customerNote: `Storefront reference: ${payload.order_id}\nTerms and privacy accepted: ${policyAcceptedAt}`,
+      customerNote,
     });
     const paymentUrl = checkout.payment_result.redirect_url;
 

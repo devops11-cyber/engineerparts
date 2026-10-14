@@ -65,6 +65,7 @@ WooCommerce configuration is required to display products. Without it, the produ
   WOOCOMMERCE_CONSUMER_KEY=ck_your_consumer_key
   WOOCOMMERCE_CONSUMER_SECRET=cs_your_consumer_secret
   ENGINEERPARTS_PROXY_SECRET=generate_at_least_32_random_characters
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-cloudflare-turnstile-site-key
   NEXT_PUBLIC_WHATSAPP_NUMBER=
   NEXT_PUBLIC_CONTACT_EMAIL=
   NEXT_PUBLIC_CONTACT_PHONE=
@@ -95,6 +96,7 @@ Required WordPress configuration:
 6. Configure and test transactional email delivery.
 7. Serve both applications over HTTPS.
 8. Do not expose WordPress account endpoints through browser CORS; Next.js proxies them server-side.
+9. Create a Cloudflare Turnstile widget for the storefront hostname, set its site key as `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Next.js, and set its secret key in WordPress as `ENGINEERPARTS_TURNSTILE_SECRET`. Registration is blocked until both keys are configured.
 
 ### Connect Nomod payments
 

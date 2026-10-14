@@ -53,9 +53,10 @@ function invalidPayload(action: string, value: unknown): string | null {
   if (action === "reset-password") return text("login", 60) && text("key", 128) && text("password", 256) ? null : "Invalid password reset request.";
   if (action === "register") {
     const required = text("firstName", 60) && text("lastName", 60) && email && text("phone", 40) && text("company", 120) && text("password", 256);
+    const captcha = text("captchaToken", 4096);
     const optional = ["jobTitle", "department", "companyWebsite", "country", "vatNumber", "customerType"]
       .every((key) => body[key] === undefined || (typeof body[key] === "string" && body[key].length <= 200));
-    return required && optional ? null : "Unable to create your account. Please check the information and try again.";
+    return required && captcha && optional ? null : "Unable to create your account. Please check the information and try again.";
   }
   return "Invalid request.";
 }
